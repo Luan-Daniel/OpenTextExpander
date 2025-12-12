@@ -1,0 +1,86 @@
+{
+  "extName": {
+    "message": "Crapless Expander"
+  },
+  "textExpansions": {
+    "message": "Expansiones de Texto"
+  },
+  "keyboardShortcuts": {
+    "message": "Atajos de Teclado"
+  },
+  "addExpansion": {
+    "message": "+ Agregar Expansión"
+  },
+  "addShortcut": {
+    "message": "+ Agregar Atajo"
+  },
+  "testPage": {
+    "message": "Página de Prueba"
+  },
+  "repoLink": {
+    "message": "Github"
+  },
+  "noExpansions": {
+    "message": "Aún no hay expansiones. ¡Agrega una para comenzar!"
+  },
+  "noShortcuts": {
+    "message": "Aún no hay atajos. ¡Agrega uno para comenzar!"
+  },
+  "editExpansion": {
+    "message": "Editar Expansión"
+  },
+  "editShortcut": {
+    "message": "Editar Atajo"
+  },
+  "trigger": {
+    "message": "Disparador (ej: '\\man'):"
+  },
+  "replacement": {
+    "message": "Texto de Reemplazo:"
+  },
+  "keys": {
+    "message": "Teclas:"
+  },
+  "ctrl": {
+    "message": "Ctrl"
+  },
+  "shift": {
+    "message": "Shift"
+  },
+  "alt": {
+    "message": "Alt"
+  },
+  "textToInsert": {
+    "message": "Texto a Insertar:"
+  },
+  "save": {
+    "message": "Guardar"
+  },
+  "delete": {
+    "message": "Eliminar"
+  },
+  "edit": {
+    "message": "Editar"
+  },
+  "fillBothFields": {
+    "message": "Por favor, complete ambos campos"
+  },
+  "enterMainKey": {
+    "message": "Por favor, ingrese una tecla principal"
+  },
+  "enterText": {
+    "message": "Por favor, ingrese el texto a insertar"
+  },
+  "shortcutsSaved": {
+    "message": "✓ Recargue cualquier página abierta para que los nuevos atajos surtan efecto."
+  },
+  "keyPlaceholder": {
+    "message": "Tecla (ej: 'm')"
+  },
+  "triggerPlaceholder": {
+    "message": "\\man"
+  },
+  "replacementPlaceholder": {
+    "message": "manuscrito"
+  }
+}

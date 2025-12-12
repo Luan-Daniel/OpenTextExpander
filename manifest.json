@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Crapless Expander",
+  "version": "1.0.0",
+  "description": "Fast text expansion and keyboard shortcuts for any text field",
+  "default_locale": "en",
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Crapless Expander"
+  },
+  "background": {
+    "service_worker": "src/background/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/shared/expansion-engine.js", "src/content/content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

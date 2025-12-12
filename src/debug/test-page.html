@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crapless Expander - Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .test-section {
+            margin-bottom: 40px;
+        }
+
+        .test-section h2 {
+            color: #34495e;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .instruction {
+            background: #ecf0f1;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #34495e;
+            margin-top: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .example-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .example-box strong {
+            color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #34495e;
+        }
+
+        .btn-secondary:hover {
+            background: #bdc3c7;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .code {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+
+        .tip {
+            background: #fef9e7;
+            border-left: 4px solid #f39c12;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #7d6608;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #ecf0f1;
+            margin: 30px 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Crapless Expander Test Page</h1>
+        <p class="subtitle">Test your text expansions and keyboard shortcuts here</p>
+
+        <!-- Test Expansion Inputs -->
+        <div class="test-section">
+            <h2>📝 Test Text Expansions</h2>
+            
+            <div class="info-box">
+                <strong>How to test:</strong> Type your expansion trigger followed by a space in the input field below.
+            </div>
+
+            <div class="input-group">
+                <label for="expansionTest">Test Text Input:</label>
+                <input type="text" id="expansionTest" placeholder="Type \man followed by space to test...">
+                <div class="instruction">
+                    Try typing: <span class="code">\man </span> (with space) to see expansion in action
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="expansionTest2">Another Test Field:</label>
+                <textarea id="expansionTest2" placeholder="Try another expansion here..."></textarea>
+            </div>
+
+            <div class="example-box">
+                <strong>Example Expansions to Create:</strong><br>
+                • <code>\man</code> → <code>manuscript</code><br>
+                • <code>\hello</code> → <code>Hello, World!</code><br>
+                • <code>\addr</code> → <code>123 Main Street, City, ST 12345</code><br>
+                • <code>\sig</code> → <code>Best regards, Your Name</code>
+            </div>
+
+            <div class="tip">
+                💡 <strong>Tip:</strong> Make sure the extension is properly loaded and you have added at least one expansion in the popup UI before testing.
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- Test Keyboard Shortcuts -->
+        <div class="test-section">
+            <h2>⌨️ Test Keyboard Shortcuts</h2>
+            
+            <div class="info-box">
+                <strong>How to test:</strong> Click in an input field below, then press your keyboard shortcut (e.g., Alt+M).
+            </div>
+
+            <div class="input-group">
+                <label for="shortcutTest">Test Shortcut Here:</label>
+                <input type="text" id="shortcutTest" placeholder="Click here and press your shortcut (e.g., Alt+M)...">
+                <div class="instruction">
+                    Try pressing: <span class="code">Alt+M</span> if you created that shortcut
+                </div>
+            </div>
+
+            <div class="example-box">
+                <strong>Example Shortcuts to Create:</strong><br>
+                • <code>Alt+M</code> → <code>manuscript</code><br>
+                • <code>Alt+H</code> → <code>Hello there!</code><br>
+                • <code>Ctrl+Shift+N</code> → <code>## New Section</code><br>
+                • <code>Alt+!</code> → <code>❌ Error</code>
+            </div>
+
+            <div class="tip">
+                💡 <strong>Tip:</strong> Avoid shortcuts that conflict with your browser. Alt+key combinations usually work well.
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- Contenteditable Test -->
+        <div class="test-section">
+            <h2>📄 Test Contenteditable Element</h2>
+            
+            <div class="info-box">
+                Some websites use contenteditable elements instead of regular inputs. Test here to see if expansions work.
+            </div>
+
+            <div class="input-group">
+                <label for="editableContent">Click to edit (contenteditable):</label>
+                <div id="editableContent" contenteditable="true" style="
+                    border: 2px solid #ecf0f1;
+                    padding: 12px;
+                    border-radius: 4px;
+                    min-height: 100px;
+                    background: white;
+                    cursor: text;
+                ">Type your expansion triggers here to test in contenteditable elements...</div>
+                <div class="instruction">
+                    This element is contenteditable, similar to Gmail compose windows
+                </div>
+            </div>
+
+            <div class="tip">
+                💡 <strong>Tip:</strong> This element behaves similarly to Gmail, Twitter compose, and other web apps that use contenteditable.
+            </div>
+        </div>
+
+        <!-- Debugging Section
+        <div class="test-section">
+            <h2>🔧 Debugging Tools</h2>
+            
+            <div class="input-group">
+                <label>Extension Status:</label>
+                <div class="instruction">
+                    Open Developer Tools (F12) and go to Console to run debugging commands:
+                    <br><br>
+                    <code style="background: #2c3e50; color: #ecf0f1; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 8px;">
+                        expansionEngine.expansions
+                    </code>
+                    - View all stored expansions
+                    <br><br>
+                    <code style="background: #2c3e50; color: #ecf0f1; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 8px;">
+                        expansionEngine.shortcuts
+                    </code>
+                    - View all shortcuts
+                    <br><br>
+                    <code style="background: #2c3e50; color: #ecf0f1; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 8px;">
+                        expansionEngine.findExpansionMatch('\\man')
+                    </code>
+                    - Test expansion matching
+                </div>
+            </div>
+        </div>-->
+
+        <div class="footer">
+            <p>Test page for Crapless Expander v1.0.0 | Check README.md for full documentation</p>
+            <p style="margin-top: 10px; font-size: 12px;">For help, visit QUICKSTART.md or DEVELOPMENT.md</p>
+        </div>
+    </div>
+</body>
+</html>

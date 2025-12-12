@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crapless Expander</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Crapless Expander</h2>
+            <button id="langSwitcher" class="lang-switcher">Lang: EN</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="expansions">Text Expansions</button>
+            <button class="tab-button" data-tab="shortcuts">Keyboard Shortcuts</button>
+        </div>
+
+        <!-- Text Expansions Tab -->
+        <div id="expansions" class="tab-content active">
+            <div id="expansionsList" class="list">
+                <div class="empty-state">No expansions yet. Add one to get started!</div>
+            </div>
+
+            <div class="controls">
+                <button id="addExpansionBtn" class="btn btn-primary">+ Add Expansion</button>
+                <!--<a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>-->
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts Tab -->
+        <div id="shortcuts" class="tab-content">
+            <div id="shortcutsList" class="list">
+                <div class="empty-state">No shortcuts yet. Add one to get started!</div>
+            </div>
+
+            <div class="controls">
+                <button id="addShortcutBtn" class="btn btn-primary">+ Add Shortcut</button>
+                <!--<a href="#" id="testPageLink2" class="btn btn-secondary">Test Page</a>-->
+            </div>
+        </div>
+
+        <div class="utility-buttons">
+        <a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>
+        <a href="#" id="githubLink" class="btn btn-github">GitHub</a>
+      </div>
+    </div>
+
+    <!-- Expansion Modal -->
+    <div id="expansionModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Edit Expansion</h2>
+            <form id="expansionForm">
+                <div class="form-group">
+                    <label for="expansionTrigger">Trigger (e.g., '\man'):</label>
+                    <input type="text" id="expansionTrigger" required placeholder="\man">
+                </div>
+                <div class="form-group">
+                    <label for="expansionReplacement">Replacement Text:</label>
+                    <textarea id="expansionReplacement" required placeholder="manuscript"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" id="deleteExpansionBtn">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shortcut Modal -->
+    <div id="shortcutModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Edit Shortcut</h2>
+            <form id="shortcutForm">
+                <div class="form-group">
+                    <label>Keys:</label>
+                    <div class="key-input">
+                        <label class="checkbox">
+                            <input type="checkbox" id="ctrlKey"> Ctrl
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="shiftKey"> Shift
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="altKey"> Alt
+                        </label>
+                        <input type="text" id="mainKey" placeholder="Key (e.g., 'm')">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="shortcutText">Text to Insert:</label>
+                    <textarea id="shortcutText" required placeholder="manuscript"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" id="deleteShortcutBtn">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

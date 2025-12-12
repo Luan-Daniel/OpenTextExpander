@@ -1,0 +1,86 @@
+{
+  "extName": {
+    "message": "Crapless Expander"
+  },
+  "textExpansions": {
+    "message": "Text Expansions"
+  },
+  "keyboardShortcuts": {
+    "message": "Keyboard Shortcuts"
+  },
+  "addExpansion": {
+    "message": "+ Add Expansion"
+  },
+  "addShortcut": {
+    "message": "+ Add Shortcut"
+  },
+  "testPage": {
+    "message": "Test Page"
+  },
+  "repoLink": {
+    "message": "Github"
+  },
+  "noExpansions": {
+    "message": "No expansions yet. Add one to get started!"
+  },
+  "noShortcuts": {
+    "message": "No shortcuts yet. Add one to get started!"
+  },
+  "editExpansion": {
+    "message": "Edit Expansion"
+  },
+  "editShortcut": {
+    "message": "Edit Shortcut"
+  },
+  "trigger": {
+    "message": "Trigger (e.g., '\\man'):"
+  },
+  "replacement": {
+    "message": "Replacement Text:"
+  },
+  "keys": {
+    "message": "Keys:"
+  },
+  "ctrl": {
+    "message": "Ctrl"
+  },
+  "shift": {
+    "message": "Shift"
+  },
+  "alt": {
+    "message": "Alt"
+  },
+  "textToInsert": {
+    "message": "Text to Insert:"
+  },
+  "save": {
+    "message": "Save"
+  },
+  "delete": {
+    "message": "Delete"
+  },
+  "edit": {
+    "message": "Edit"
+  },
+  "fillBothFields": {
+    "message": "Please fill in both fields"
+  },
+  "enterMainKey": {
+    "message": "Please enter a main key"
+  },
+  "enterText": {
+    "message": "Please enter text to insert"
+  },
+  "shortcutsSaved": {
+    "message": "✓ Reload any open pages for new shortcuts to take effect."
+  },
+  "keyPlaceholder": {
+    "message": "Key (e.g., 'm')"
+  },
+  "triggerPlaceholder": {
+    "message": "\\man"
+  },
+  "replacementPlaceholder": {
+    "message": "manuscript"
+  }
+}
