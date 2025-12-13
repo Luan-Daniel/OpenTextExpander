@@ -126,7 +126,7 @@ class PopupManager {
   }
 
   openGitHubPage() {
-    const githubUrl = 'https://github.com/your-repo'; // Replace with actual URL
+    const githubUrl = 'https://github.com/Luan-Daniel/OpenTextExpander'; // Replace with actual URL
     window.open(githubUrl, '_blank');
   }
 
