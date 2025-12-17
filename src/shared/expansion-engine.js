@@ -21,10 +21,15 @@ class ExpansionEngine {
    */
   async initialize() {
     try {
+      console.info('[Expander] Expansion engine init start');
       const data = await this._getStorageData();
       this._buildTrie(data.expansions || []);
       this._buildShortcuts(data.shortcuts || []);
       this.isReady = true;
+      console.info('[Expander] Expansion engine ready', {
+        expansions: this.expansions.size,
+        shortcuts: this.shortcuts.size
+      });
     } catch (error) {
       console.error('[!] Failed to initialize expansion engine:', error);
       this.isReady = true; // Still mark as ready to avoid blocking

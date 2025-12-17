@@ -9,14 +9,20 @@ class PopupManager {
     this.editingExpansionIndex = null;
     this.editingShortcutIndex = null;
     this.currentLanguage = 'en';
+    this.extensionReady = false;
+    this.contentScriptReady = false;
     
     this.setupElements();
     this.attachListeners();
     this.loadLanguage();
     this.loadData();
+    this.checkExtensionStatus();
   }
 
   setupElements() {
+    // Status indicator
+    this.statusIndicator = document.getElementById('statusIndicator');
+    
     // Language switcher
     this.langSwitcher = document.getElementById('langSwitcher');
     
@@ -482,42 +488,9 @@ class PopupManager {
       (response) => {
         if (response?.success) {
           console.log('Shortcuts saved');
-          // Show notification to reload page
-          this._showReloadNotification();
         }
       }
     );
-  }
-
-  /**
-   * Show notification about reloading page for new shortcuts
-   */
-  _showReloadNotification() {
-    // Create temporary notification element
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #3498db;
-      color: white;
-      padding: 15px 20px;
-      border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      font-size: 14px;
-      z-index: 10000;
-      max-width: 300px;
-    `;
-    const msg = this.messages?.shortcutsSaved?.message || '✓ Shortcuts saved! <strong>Reload any open pages for new shortcuts to take effect.</strong>';
-    notification.innerHTML = msg;
-    document.body.appendChild(notification);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transition = 'opacity 0.3s';
-      setTimeout(() => notification.remove(), 300);
-    }, 5000);
   }
 
   openModal(modal) {
@@ -532,6 +505,102 @@ class PopupManager {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  /**
+   * Check extension and content script status
+   */
+  async checkExtensionStatus() {
+    if (!this.statusIndicator) return;
+    
+    this.updateStatusIndicator('loading');
+    
+    // Check background service worker
+    try {
+      const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                        typeof browser !== 'undefined' ? browser : null;
+      
+      if (!chrome_api) {
+        this.updateStatusIndicator('error');
+        return;
+      }
+
+      // Ping background to confirm it's alive
+      chrome_api.runtime.sendMessage(
+        { action: 'ping' },
+        (response) => {
+          if (response?.ok) {
+            this.extensionReady = true;
+            this.checkContentScriptStatus();
+          } else {
+            this.updateStatusIndicator('error');
+          }
+        }
+      );
+    } catch (err) {
+      console.error('[Expander] Failed to check extension status:', err);
+      this.updateStatusIndicator('error');
+    }
+  }
+
+  /**
+   * Check if content script is loaded in current tab
+   */
+  checkContentScriptStatus() {
+    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                      typeof browser !== 'undefined' ? browser : null;
+    
+    if (!chrome_api || !chrome_api.tabs) {
+      // No tabs API, mark as ready anyway (popup doesn't need content script)
+      this.contentScriptReady = true;
+      this.updateStatusIndicator('ready');
+      return;
+    }
+
+    // Get current active tab and ping content script
+    chrome_api.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) {
+        this.updateStatusIndicator('ready');
+        return;
+      }
+
+      chrome_api.tabs.sendMessage(
+        tabs[0].id,
+        { action: 'ping' },
+        (response) => {
+          // Check for errors (e.g., content script not loaded due to browser restrictions)
+          const err = chrome_api.runtime.lastError;
+          if (err) {
+            // Forbidden: extension cannot load on this page (extension URLs, system pages, etc)
+            this.updateStatusIndicator('forbidden');
+          } else if (response?.ok) {
+            this.contentScriptReady = true;
+            this.updateStatusIndicator('ready');
+          } else {
+            // Content script not loaded on this tab, but not forbidden
+            this.updateStatusIndicator('ready');
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Update status indicator emoji and title
+   */
+  updateStatusIndicator(state) {
+    if (!this.statusIndicator) return;
+
+    const states = {
+      loading: { emoji: '⏳', title: 'Loading extension...' },
+      ready: { emoji: '✅', title: 'Extension ready' },
+      error: { emoji: '❌', title: 'Extension error' },
+      forbidden: { emoji: '🚫', title: 'Content script not loaded on this page' }
+    };
+
+    const stateInfo = states[state] || states.error;
+    this.statusIndicator.textContent = stateInfo.emoji;
+    this.statusIndicator.title = stateInfo.title;
   }
 }
 

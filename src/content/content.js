@@ -4,6 +4,8 @@
  * Optimized for minimal overhead during typing
  */
 
+console.log('[Expander] Content script loaded');
+
 class ContentScriptManager {
   constructor() {
     this.activeElement = null;
@@ -14,6 +16,7 @@ class ContentScriptManager {
   }
 
   init() {
+    console.info('[Expander] Content manager init');
     this._attachListeners();
     this._setupMessageListener();
   }
@@ -216,14 +219,33 @@ class ContentScriptManager {
   _setupMessageListener() {
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === 'ping') {
+          sendResponse?.({ ok: true, source: 'content' });
+          return; // No async work
+        }
+
         if (request.action === 'expansionsUpdated') {
+          console.info('[Expander] expansionsUpdated message received');
+          expansionEngine.initialize();
+        }
+
+        if (request.action === 'shortcutsUpdated') {
+          console.info('[Expander] shortcutsUpdated message received');
           expansionEngine.initialize();
         }
       });
     } else if (typeof browser !== 'undefined' && browser.runtime) {
       browser.runtime.onMessage.addListener((request) => {
         if (request.action === 'expansionsUpdated') {
+          console.info('[Expander] expansionsUpdated message received');
           expansionEngine.initialize();
+        }
+        if (request.action === 'shortcutsUpdated') {
+          console.info('[Expander] shortcutsUpdated message received');
+          expansionEngine.initialize();
+        }
+        if (request.action === 'ping') {
+          return { ok: true, source: 'content' };
         }
       });
     }
