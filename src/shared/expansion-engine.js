@@ -146,6 +146,9 @@ class ExpansionEngine {
     if (event.shiftKey) parts.push('shift');
     if (event.altKey) parts.push('alt');
     
+    // Safety check for event.key
+    if (!event.key) return null;
+    
     const key = event.key.toLowerCase();
     // Only add non-modifier keys
     if (!['control', 'shift', 'alt', 'meta'].includes(key)) {
