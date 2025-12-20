@@ -129,7 +129,8 @@ class ContentScriptManager {
   _updateBuffer(element) {
     // For contenteditable elements
     if (element.contentEditable === 'true') {
-      this.buffer = element.innerText || '';
+      // Use textContent instead of innerText for consistent newline handling
+      this.buffer = element.textContent || '';
       // Get cursor position for contenteditable
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
@@ -217,35 +218,59 @@ class ContentScriptManager {
    * Properly handles the space delimiter by removing trigger + space
    */
   _replaceText(element, match) {
-    // Don't add newline for Enter—it's already in the buffer
-    const delimiterOut = this._lastDelimiter === 'enter' ? '' : ' ';
+    const isContentEditable = element.contentEditable === 'true';
+    const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
+    const punctLen = this._pendingPunctuation?.length || 0;
+    
+    // For contenteditable with space: preserve the space already in DOM
+    // For input/textarea with space: delete and re-add the space
+    const shouldDeleteDelimiter = !isContentEditable && this._lastDelimiter !== 'enter';
+    const delimiterOut = shouldDeleteDelimiter ? ' ' : '';
     const tail = (this._pendingPunctuation || '') + delimiterOut;
-    if (element.contentEditable === 'true') {
-      // For contenteditable - use stored cursor position
-      const text = element.innerText;
-      const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
-      const punctLen = this._pendingPunctuation?.length || 0;
-      const before = text.substring(0, this.cursorPos - match.trigger.length - punctLen - excludeLen);
-      const after = text.substring(this.cursorPos);
-      element.innerText = before + match.replacement + tail + after;
-      
-      // Restore cursor position
-      const newCursorPos = before.length + match.replacement.length + tail.length;
+    
+    if (isContentEditable) {
+      // For contenteditable - use Selection API to preserve DOM structure
+      // Don't delete the space for space delimiter; it's already correctly positioned
       const selection = window.getSelection();
-      const range = document.createRange();
-      const textNode = element.firstChild || element;
-      if (textNode.nodeType === Node.TEXT_NODE) {
-        range.setStart(textNode, Math.min(newCursorPos, textNode.length));
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
+      if (selection.rangeCount === 0) return;
+      
+      const range = selection.getRangeAt(0);
+      const triggerLen = match.trigger.length;
+      
+      // Only delete trigger + punctuation (not the delimiter for contenteditable)
+      const charsToDelete = triggerLen + punctLen;
+      
+      // Create a range that covers the text to replace
+      // Exclude the delimiter from the deletion range
+      const deleteRangeEnd = range.endOffset - excludeLen;
+      const deleteRange = range.cloneRange();
+      deleteRange.setEnd(range.endContainer, deleteRangeEnd);
+      deleteRange.setStart(range.endContainer, Math.max(0, deleteRangeEnd - charsToDelete));
+      
+      // Delete the trigger text
+      deleteRange.deleteContents();
+      
+      // Insert the replacement text (no tail needed; space is preserved)
+      const replacementText = document.createTextNode(match.replacement);
+      deleteRange.insertNode(replacementText);
+      
+      // Position cursor after the replacement text and delimiter
+      const newRange = document.createRange();
+      if (this._lastDelimiter === 'enter') {
+        // For Enter: position cursor at the end of the replacement text (newline comes after from default behavior)
+        newRange.setStartAfter(replacementText);
+      } else {
+        // For space: position cursor after the space in the following text node
+        newRange.setStart(range.endContainer, range.endOffset - excludeLen + 1);
       }
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
     } else if (element.value !== undefined) {
       // For input/textarea - use stored cursor position
       const text = element.value;
-      const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
-      const punctLen = this._pendingPunctuation?.length || 0;
-      const before = text.substring(0, this.cursorPos - match.trigger.length - punctLen - excludeLen);
+      const deleteLen = shouldDeleteDelimiter ? excludeLen : 0;
+      const before = text.substring(0, this.cursorPos - match.trigger.length - punctLen - deleteLen);
       const after = text.substring(this.cursorPos);
       element.value = before + match.replacement + tail + after;
       
