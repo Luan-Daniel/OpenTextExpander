@@ -137,7 +137,6 @@ h2 {
 }
 
 .btn-primary {
-  margin-bottom: 4px;
   background: #3498db;
   color: white;
 }
@@ -324,6 +323,7 @@ textarea {
 }
 
 .checkbox {
+  margin-top: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
