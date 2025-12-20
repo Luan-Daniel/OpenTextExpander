@@ -29,7 +29,8 @@
 
             <div class="controls">
                 <button id="addExpansionBtn" class="btn btn-primary">+ Add Expansion</button>
-                <!--<a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>-->
+                <label class="checkbox"><input type="checkbox" id="punctAware"> Punctuation aware</label>
+                <label class="checkbox"><input type="checkbox" id="caseSensitive"> Case sensitive</label>
             </div>
         </div>
 
@@ -41,14 +42,21 @@
 
             <div class="controls">
                 <button id="addShortcutBtn" class="btn btn-primary">+ Add Shortcut</button>
-                <!--<a href="#" id="testPageLink2" class="btn btn-secondary">Test Page</a>-->
             </div>
         </div>
 
-        <div class="utility-buttons">
-        <a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>
-        <a href="#" id="githubLink" class="btn btn-github">GitHub</a>
-        </div>
+                <div class="utility-buttons">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <label class="checkbox"><input type="checkbox" id="domainScope"> Per-domain settings</label>
+                            <span id="currentDomain" style="font-size:12px; color:#666;"></span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button id="importBtn" class="btn btn-secondary" type="button">Import</button>
+                            <button id="exportBtn" class="btn btn-secondary" type="button">Export</button>
+                            <a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>
+                            <a href="#" id="githubLink" class="btn btn-github">GitHub</a>
+                        </div>
+                </div>
     </div>
 
     <!-- Expansion Modal -->

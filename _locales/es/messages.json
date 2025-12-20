@@ -82,5 +82,20 @@
   },
   "replacementPlaceholder": {
     "message": "manuscrito"
+  },
+  "punctuationAware": {
+    "message": "Consciente de puntuación"
+  },
+  "caseSensitive": {
+    "message": "Sensible a mayúsculas"
+  },
+  "perDomainSettings": {
+    "message": "Configuración por dominio"
+  },
+  "import": {
+    "message": "Importar"
+  },
+  "export": {
+    "message": "Exportar"
   }
 }

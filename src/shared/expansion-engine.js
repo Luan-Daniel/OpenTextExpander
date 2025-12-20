@@ -14,21 +14,25 @@ class ExpansionEngine {
     this.shortcuts = new Map();
 
     this.isReady = false;
+    this.settings = { caseSensitive: false };
   }
 
   /**
    * Initialize engine with stored expansions and shortcuts
+   * Loads both global and domain-scoped data for current page
    */
-  async initialize() {
+  async initialize(domain = null) {
     try {
       console.info('[Expander] Expansion engine init start');
-      const data = await this._getStorageData();
+      const data = await this._getStorageData(domain);
       this._buildTrie(data.expansions || []);
       this._buildShortcuts(data.shortcuts || []);
+      this.settings = Object.assign(this.settings, data.settings || {});
       this.isReady = true;
       console.info('[Expander] Expansion engine ready', {
         expansions: this.expansions.size,
-        shortcuts: this.shortcuts.size
+        shortcuts: this.shortcuts.size,
+        domain: domain || 'global'
       });
     } catch (error) {
       console.error('[!] Failed to initialize expansion engine:', error);
@@ -38,15 +42,48 @@ class ExpansionEngine {
 
   /**
    * Get data from storage (Chromium/Firefox compatible)
+   * Loads domain-scoped data if domain is provided
    */
-  _getStorageData() {
+  _getStorageData(domain = null) {
     return new Promise((resolve) => {
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.sync.get(['expansions', 'shortcuts'], (result) => {
-          resolve(result);
+        // Get all storage keys to check for domain data
+        chrome.storage.sync.get(null, (allData) => {
+          let expansions = allData?.expansions || [];
+          let shortcuts = allData?.shortcuts || [];
+          
+          // If domain is provided and domain scope is enabled, use domain-scoped data
+          if (domain && allData?.expansions_domains?.[domain]) {
+            expansions = allData.expansions_domains[domain];
+          }
+          if (domain && allData?.shortcuts_domains?.[domain]) {
+            shortcuts = allData.shortcuts_domains[domain];
+          }
+          
+          resolve({
+            expansions,
+            shortcuts,
+            settings: allData?.settings || {}
+          });
         });
       } else if (typeof browser !== 'undefined' && browser.storage) {
-        browser.storage.sync.get(['expansions', 'shortcuts']).then(resolve);
+        browser.storage.sync.get().then(allData => {
+          let expansions = allData?.expansions || [];
+          let shortcuts = allData?.shortcuts || [];
+          
+          if (domain && allData?.expansions_domains?.[domain]) {
+            expansions = allData.expansions_domains[domain];
+          }
+          if (domain && allData?.shortcuts_domains?.[domain]) {
+            shortcuts = allData.shortcuts_domains[domain];
+          }
+          
+          resolve({
+            expansions,
+            shortcuts,
+            settings: allData?.settings || {}
+          });
+        });
       } else {
         resolve({});
       }
@@ -63,7 +100,7 @@ class ExpansionEngine {
     for (const expansion of expansions) {
       if (!expansion.trigger || !expansion.replacement) continue;
 
-      const trigger = expansion.trigger.toLowerCase();
+      const trigger = this.settings.caseSensitive ? expansion.trigger : expansion.trigger.toLowerCase();
       this.expansions.set(trigger, expansion.replacement);
 
       // Build trie for faster matching
@@ -100,7 +137,7 @@ class ExpansionEngine {
     
     // Look for word boundaries to find potential triggers
     // Check backwards from end of text for trigger sequences
-    const lowerText = text.toLowerCase();
+    const lowerText = this.settings.caseSensitive ? text : text.toLowerCase();
     
     // Check if current text matches any trigger
     if (this.expansions.has(lowerText)) {

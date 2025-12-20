@@ -38,6 +38,12 @@ class PopupManager {
     this.addShortcutBtn = document.getElementById('addShortcutBtn');
     this.testPageLink = document.getElementById('testPageLink');
     this.githubLink = document.getElementById('githubLink');
+    this.importBtn = document.getElementById('importBtn');
+    this.exportBtn = document.getElementById('exportBtn');
+    this.domainScope = document.getElementById('domainScope');
+    this.currentDomainEl = document.getElementById('currentDomain');
+    this.punctAware = document.getElementById('punctAware');
+    this.caseSensitive = document.getElementById('caseSensitive');
     
     // Modals
     this.expansionModal = document.getElementById('expansionModal');
@@ -75,6 +81,11 @@ class PopupManager {
     // Add buttons
     this.addExpansionBtn.addEventListener('click', () => this.openExpansionModal());
     this.addShortcutBtn.addEventListener('click', () => this.openShortcutModal());
+    this.importBtn.addEventListener('click', () => this.importSettings());
+    this.exportBtn.addEventListener('click', () => this.exportSettings());
+    this.domainScope.addEventListener('change', () => this.toggleScope());
+    this.punctAware.addEventListener('change', () => this.saveSettings());
+    this.caseSensitive.addEventListener('change', () => this.saveSettings());
 
     // Test page links
     this.testPageLink.addEventListener('click', (e) => {
@@ -132,7 +143,7 @@ class PopupManager {
   }
 
   openGitHubPage() {
-    const githubUrl = 'https://github.com/Luan-Daniel/OpenTextExpander'; // Replace with actual URL
+    const githubUrl = 'https://github.com/Luan-Daniel/OpenTextExpander';
     window.open(githubUrl, '_blank');
   }
 
@@ -143,9 +154,32 @@ class PopupManager {
       
       if (!chrome_api) return;
 
+      // Restore scope preference
+      const savedScope = localStorage.getItem('crapless_domainScope') === 'true';
+      if (this.domainScope) {
+        this.domainScope.checked = savedScope;
+      }
+
+      // Resolve current active tab domain (must be async)
+      const domain = await new Promise((resolve) => {
+        chrome_api.tabs?.query({ active: true, currentWindow: true }, (tabs) => {
+          const url = tabs && tabs[0]?.url;
+          try {
+            const hostname = url ? new URL(url).hostname : '';
+            this.currentDomain = hostname;
+            if (this.currentDomainEl) this.currentDomainEl.textContent = hostname ? `Domain: ${hostname}` : '';
+            resolve(hostname);
+          } catch {
+            resolve('');
+          }
+        });
+      });
+
+      const scope = this.domainScope?.checked ? 'domain' : 'global';
+
       // Load expansions
       chrome_api.runtime.sendMessage(
-        { action: 'getExpansions' },
+        { action: 'getExpansions', scope, domain },
         (response) => {
           if (response) {
             this.expansions = response.expansions || [];
@@ -156,12 +190,22 @@ class PopupManager {
 
       // Load shortcuts
       chrome_api.runtime.sendMessage(
-        { action: 'getShortcuts' },
+        { action: 'getShortcuts', scope, domain },
         (response) => {
           if (response) {
             this.shortcuts = response.shortcuts || [];
             this.renderShortcuts();
           }
+        }
+      );
+
+      // Load settings
+      chrome_api.runtime.sendMessage(
+        { action: 'getSettings' },
+        (response) => {
+          const settings = response?.settings || {};
+          this.punctAware.checked = !!settings.punctuationAware;
+          this.caseSensitive.checked = !!settings.caseSensitive;
         }
       );
     } catch (error) {
@@ -180,6 +224,145 @@ class PopupManager {
       content.classList.remove('active');
     });
     document.getElementById(tabName).classList.add('active');
+  }
+
+  // Save settings (punctuation aware, case sensitive)
+  saveSettings() {
+    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                      typeof browser !== 'undefined' ? browser : null;
+    if (!chrome_api) return;
+    const settings = {
+      punctuationAware: this.punctAware.checked,
+      caseSensitive: this.caseSensitive.checked
+    };
+    chrome_api.runtime.sendMessage({ action: 'saveSettings', settings }, () => {
+      // Broadcast to all tabs to reload engine
+      chrome_api.tabs?.query({}, (tabs) => {
+        tabs?.forEach(tab => {
+          chrome_api.tabs.sendMessage(tab.id, { action: 'settingsUpdated' }, () => {
+            void chrome_api.runtime.lastError;
+          });
+        });
+      });
+    });
+  }
+
+  // Scope toggle: reload data with new scope
+  toggleScope() {
+    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                      typeof browser !== 'undefined' ? browser : null;
+    if (!chrome_api) return;
+
+    const checked = this.domainScope.checked;
+    this.currentDomainEl.textContent = checked ? window.location.hostname : '';
+    
+    // Persist scope preference to localStorage
+    localStorage.setItem('crapless_domainScope', checked ? 'true' : 'false');
+    
+    // Persist scope to storage.sync so content scripts can see it
+    chrome_api.runtime.sendMessage(
+      { 
+        action: 'saveSettings', 
+        settings: { 
+          domainScope: checked 
+        },
+        merge: true // Signal to merge with existing settings
+      },
+      () => {
+        // Reload data with new scope
+        this.loadData();
+      }
+    );
+  }
+
+  /**
+   * Export all settings (global + domain-specific) to JSON file
+   */
+  exportSettings() {
+    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                      typeof browser !== 'undefined' ? browser : null;
+    if (!chrome_api) return;
+
+    // Get all data at once
+    chrome_api.storage?.sync?.get(null, (allData) => {
+      const backup = {
+        version: 1,
+        exportDate: new Date().toISOString(),
+        global: {
+          expansions: allData?.expansions || [],
+          shortcuts: allData?.shortcuts || [],
+          settings: allData?.settings || {}
+        },
+        domains: {
+          expansions: allData?.expansions_domains || {},
+          shortcuts: allData?.shortcuts_domains || {}
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `open-text-expander-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  /**
+   * Import all settings from JSON backup file
+   */
+  importSettings() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const backup = JSON.parse(text);
+
+        const chrome_api = typeof chrome !== 'undefined' ? chrome : 
+                          typeof browser !== 'undefined' ? browser : null;
+        if (!chrome_api) return;
+
+        const updates = {};
+
+        // Restore global data
+        if (backup.global) {
+          if (Array.isArray(backup.global.expansions)) {
+            updates.expansions = backup.global.expansions;
+          }
+          if (Array.isArray(backup.global.shortcuts)) {
+            updates.shortcuts = backup.global.shortcuts;
+          }
+          if (backup.global.settings && typeof backup.global.settings === 'object') {
+            updates.settings = backup.global.settings;
+          }
+        }
+
+        // Restore domain data
+        if (backup.domains) {
+          if (backup.domains.expansions && typeof backup.domains.expansions === 'object') {
+            updates.expansions_domains = backup.domains.expansions;
+          }
+          if (backup.domains.shortcuts && typeof backup.domains.shortcuts === 'object') {
+            updates.shortcuts_domains = backup.domains.shortcuts;
+          }
+        }
+
+        // Save all updates
+        chrome_api.storage?.sync?.set(updates, () => {
+          // Reload current popup
+          this.loadData();
+          alert('All settings imported successfully!');
+        });
+      } catch (e) {
+        alert('Invalid backup file: ' + e.message);
+      }
+    };
+    input.click();
   }
 
   /**
@@ -230,6 +413,8 @@ class PopupManager {
       // Update buttons
       if (this.addExpansionBtn) this.addExpansionBtn.textContent = messages.addExpansion.message;
       if (this.addShortcutBtn) this.addShortcutBtn.textContent = messages.addShortcut.message;
+      if (this.importBtn) this.importBtn.textContent = messages.import.message;
+      if (this.exportBtn) this.exportBtn.textContent = messages.export.message;
       if (this.testPageLink) this.testPageLink.textContent = messages.testPage.message;
       if (this.githubLink) this.githubLink.textContent = messages.repoLink.message;
       
@@ -268,6 +453,30 @@ class PopupManager {
           btn.textContent = messages.delete.message;
         }
       });
+      
+      // Update settings checkboxes
+      const punctAwareLabel = document.querySelector('label:has(#punctAware)');
+      const caseSensitiveLabel = document.querySelector('label:has(#caseSensitive)');
+      const domainScopeLabel = document.querySelector('label:has(#domainScope)');
+      
+      if (punctAwareLabel) {
+        const checkbox = punctAwareLabel.querySelector('input');
+        punctAwareLabel.textContent = '';
+        punctAwareLabel.appendChild(checkbox);
+        punctAwareLabel.appendChild(document.createTextNode(` ${messages.punctuationAware.message}`));
+      }
+      if (caseSensitiveLabel) {
+        const checkbox = caseSensitiveLabel.querySelector('input');
+        caseSensitiveLabel.textContent = '';
+        caseSensitiveLabel.appendChild(checkbox);
+        caseSensitiveLabel.appendChild(document.createTextNode(` ${messages.caseSensitive.message}`));
+      }
+      if (domainScopeLabel) {
+        const checkbox = domainScopeLabel.querySelector('input');
+        domainScopeLabel.textContent = '';
+        domainScopeLabel.appendChild(checkbox);
+        domainScopeLabel.appendChild(document.createTextNode(` ${messages.perDomainSettings.message}`));
+      }
       
       // Re-render lists to update empty states
       this.renderExpansions();
@@ -369,6 +578,14 @@ class PopupManager {
       return;
     }
 
+    // Prevent duplicates: offer overwrite or cancel
+    const existingIndex = this.expansions.findIndex(exp => exp.trigger === trigger);
+    if (existingIndex !== -1 && existingIndex !== this.editingExpansionIndex) {
+      const overwrite = confirm(`Trigger "${trigger}" already exists. Overwrite?`);
+      if (!overwrite) return;
+      this.editingExpansionIndex = existingIndex;
+    }
+
     if (this.editingExpansionIndex === null) {
       this.expansions.push({ trigger, replacement });
     } else {
@@ -394,9 +611,8 @@ class PopupManager {
                       typeof browser !== 'undefined' ? browser : null;
     
     if (!chrome_api) return;
-
     chrome_api.runtime.sendMessage(
-      { action: 'saveExpansions', expansions: this.expansions },
+      { action: 'saveExpansions', expansions: this.expansions, scope: this.domainScope?.checked ? 'domain' : 'global', domain: this.currentDomain },
       (response) => {
         if (response?.success) {
           console.log('Expansions saved');
@@ -484,7 +700,7 @@ class PopupManager {
     if (!chrome_api) return;
 
     chrome_api.runtime.sendMessage(
-      { action: 'saveShortcuts', shortcuts: this.shortcuts },
+      { action: 'saveShortcuts', shortcuts: this.shortcuts, scope: this.domainScope?.checked ? 'domain' : 'global', domain: this.currentDomain },
       (response) => {
         if (response?.success) {
           console.log('Shortcuts saved');

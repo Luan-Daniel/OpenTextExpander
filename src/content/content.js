@@ -11,15 +11,46 @@ class ContentScriptManager {
     this.activeElement = null;
     this.buffer = '';
     this.cursorPos = 0; // Track cursor position
-    this.expansionDelimiter = ' '; // Space triggers expansion check
+    this.expansionDelimiter = ' '; // Space triggers expansion check; Enter supported separately
     this.minTriggerLength = 2; // Minimum characters for expansion
     this.maxTriggerLength = 50; // Maximum trigger length
+    this.settings = { punctuationAware: false, caseSensitive: false };
+    this._lastDelimiter = null; // 'space' | 'enter'
   }
 
   init() {
     console.info('[Expander] Content manager init');
     this._attachListeners();
     this._setupMessageListener();
+    // Load settings
+    try {
+      const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
+      if (api?.storage?.sync) {
+        api.storage.sync.get(['settings'], (result) => {
+          if (result?.settings) this.settings = Object.assign(this.settings, result.settings);
+        });
+      }
+    } catch {}
+  }
+
+  /**
+   * Reinitialize engine with correct domain context based on current settings
+   */
+  async _reinitializeEngine() {
+    try {
+      const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
+      if (!api?.storage?.sync) return;
+
+      // Check if domain scope is enabled
+      api.storage.sync.get(['settings'], (result) => {
+        const domainScope = result?.settings?.domainScope || false;
+        const domain = domainScope ? currentDomain : null;
+        console.info('[Expander] Reinitializing engine', { domainScope, domain });
+        expansionEngine.initialize(domain);
+      });
+    } catch (err) {
+      console.warn('[Expander] Failed to reinitialize engine:', err);
+    }
   }
 
   /**
@@ -39,8 +70,19 @@ class ContentScriptManager {
     // Main input handler - called on every keystroke
     document.addEventListener('input', (e) => this._handleInput(e), true);
 
-    // Handle keyboard shortcuts
-    document.addEventListener('keydown', (e) => this._handleKeydown(e), true);
+    // Handle keyboard shortcuts and Enter delimiter
+    document.addEventListener('keydown', (e) => {
+      // Enter should also trigger expansion
+      if (this._isEditableElement(e.target) && e.key === 'Enter') {
+        this._updateBuffer(e.target);
+        this._lastDelimiter = 'enter';
+        this._checkAndApplyExpansion(e.target);
+        // Let default Enter proceed (newline/submit)
+        this._lastDelimiter = null;
+      } else {
+        this._handleKeydown(e);
+      }
+    }, true);
   }
 
   /**
@@ -112,9 +154,11 @@ class ContentScriptManager {
    * Typically triggered on space, but could be other delimiters
    */
   _shouldCheckExpansion(event) {
-    // Check if character is the expansion delimiter
+    // Check if character is the expansion delimiter (space) or Enter via keydown
     const char = event.data;
-    return char === this.expansionDelimiter && this.buffer.length > this.minTriggerLength;
+    const isSpace = char === this.expansionDelimiter;
+    const isEnter = this._lastDelimiter === 'enter';
+    return (isSpace || isEnter) && this.buffer.length > this.minTriggerLength;
   }
 
   /**
@@ -122,16 +166,25 @@ class ContentScriptManager {
    * Works backwards from the cursor position, excludes the space itself
    */
   _extractTrigger(buffer) {
-    // Extract text up to cursor position (excluding the space that was just typed)
-    const textBeforeCursor = buffer.substring(0, this.cursorPos - 1);
+    // Determine delimiter length to exclude: space (1) or enter (0, since keydown didn't insert yet)
+    const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
+    const textBeforeCursor = buffer.substring(0, this.cursorPos - excludeLen);
     
     // Find the last word before cursor (after last whitespace)
     const lastSpaceIndex = textBeforeCursor.lastIndexOf(' ');
     const lastNewlineIndex = textBeforeCursor.lastIndexOf('\n');
     const lastBreak = Math.max(lastSpaceIndex, lastNewlineIndex);
     
-    // Extract word from last break to cursor
-    const word = lastBreak >= 0 ? textBeforeCursor.substring(lastBreak + 1) : textBeforeCursor;
+    // Extract word (potentially with trailing punctuation - max 1 char)
+    let word = lastBreak >= 0 ? textBeforeCursor.substring(lastBreak + 1) : textBeforeCursor;
+    let punctuation = '';
+    if (this.settings.punctuationAware) {
+      const m = word.match(/[\.,;:!\?\)\]\}"'`]$/);
+      if (m) {
+        punctuation = m[0];
+        word = word.substring(0, word.length - 1);
+      }
+    }
     
     if (word.length < this.minTriggerLength) return null;
     if (word.length > this.maxTriggerLength) {
@@ -139,6 +192,8 @@ class ContentScriptManager {
       return word.substring(word.length - this.maxTriggerLength);
     }
     
+    // Store punctuation for re-append in replacement
+    this._pendingPunctuation = punctuation;
     return word;
   }
 
@@ -162,15 +217,20 @@ class ContentScriptManager {
    * Properly handles the space delimiter by removing trigger + space
    */
   _replaceText(element, match) {
+    // Don't add newline for Enter—it's already in the buffer
+    const delimiterOut = this._lastDelimiter === 'enter' ? '' : ' ';
+    const tail = (this._pendingPunctuation || '') + delimiterOut;
     if (element.contentEditable === 'true') {
       // For contenteditable - use stored cursor position
       const text = element.innerText;
-      const before = text.substring(0, this.cursorPos - match.trigger.length - 1);
+      const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
+      const punctLen = this._pendingPunctuation?.length || 0;
+      const before = text.substring(0, this.cursorPos - match.trigger.length - punctLen - excludeLen);
       const after = text.substring(this.cursorPos);
-      element.innerText = before + match.replacement + ' ' + after;
+      element.innerText = before + match.replacement + tail + after;
       
       // Restore cursor position
-      const newCursorPos = before.length + match.replacement.length + 1;
+      const newCursorPos = before.length + match.replacement.length + tail.length;
       const selection = window.getSelection();
       const range = document.createRange();
       const textNode = element.firstChild || element;
@@ -183,12 +243,14 @@ class ContentScriptManager {
     } else if (element.value !== undefined) {
       // For input/textarea - use stored cursor position
       const text = element.value;
-      const before = text.substring(0, this.cursorPos - match.trigger.length - 1);
+      const excludeLen = this._lastDelimiter === 'enter' ? 0 : 1;
+      const punctLen = this._pendingPunctuation?.length || 0;
+      const before = text.substring(0, this.cursorPos - match.trigger.length - punctLen - excludeLen);
       const after = text.substring(this.cursorPos);
-      element.value = before + match.replacement + ' ' + after;
+      element.value = before + match.replacement + tail + after;
       
-      // Restore cursor position after replacement + space
-      const newPos = before.length + match.replacement.length + 1;
+      // Restore cursor position after replacement + tail
+      const newPos = before.length + match.replacement.length + tail.length;
       element.setSelectionRange(newPos, newPos);
     }
 
@@ -256,12 +318,28 @@ class ContentScriptManager {
 
         if (request.action === 'expansionsUpdated') {
           console.info('[Expander] expansionsUpdated message received');
-          expansionEngine.initialize();
+          this._reinitializeEngine();
         }
 
         if (request.action === 'shortcutsUpdated') {
           console.info('[Expander] shortcutsUpdated message received');
-          expansionEngine.initialize();
+          this._reinitializeEngine();
+        }
+
+        if (request.action === 'settingsUpdated') {
+          console.info('[Expander] settingsUpdated message received');
+          // Reload settings and engine
+          try {
+            const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
+            if (api?.storage?.sync) {
+              api.storage.sync.get(['settings'], (result) => {
+                if (result?.settings) {
+                  this.settings = Object.assign(this.settings, result.settings);
+                  this._reinitializeEngine();
+                }
+              });
+            }
+          } catch {}
         }
       });
     } else if (typeof browser !== 'undefined' && browser.runtime) {
@@ -272,7 +350,21 @@ class ContentScriptManager {
         }
         if (request.action === 'shortcutsUpdated') {
           console.info('[Expander] shortcutsUpdated message received');
-          expansionEngine.initialize();
+          this._reinitializeEngine();
+        }
+        if (request.action === 'settingsUpdated') {
+          console.info('[Expander] settingsUpdated message received');
+          try {
+            const api = typeof browser !== 'undefined' ? browser : null;
+            if (api?.storage?.sync) {
+              api.storage.sync.get(['settings']).then(result => {
+                if (result?.settings) {
+                  this.settings = Object.assign(this.settings, result.settings);
+                  this._reinitializeEngine();
+                }
+              });
+            }
+          } catch {}
         }
         if (request.action === 'ping') {
           return { ok: true, source: 'content' };
@@ -285,11 +377,16 @@ class ContentScriptManager {
 // Initialize content script manager
 const contentManager = new ContentScriptManager();
 
+// Get current page domain
+const currentDomain = window.location.hostname;
+
 // Wait for expansion engine to be ready
 const initCheck = setInterval(() => {
   if (expansionEngine.isReady) {
     clearInterval(initCheck);
     contentManager.init();
+    // Initialize engine with domain context based on current settings
+    contentManager._reinitializeEngine();
   }
 }, 50);
 
@@ -298,5 +395,6 @@ setTimeout(() => {
   clearInterval(initCheck);
   if (!expansionEngine.isReady) {
     contentManager.init();
+    contentManager._reinitializeEngine();
   }
 }, 2000);

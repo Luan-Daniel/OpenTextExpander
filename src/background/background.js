@@ -36,35 +36,113 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
     }
 
     if (request.action === 'saveExpansions') {
-      chrome.storage.sync.set({ expansions: request.expansions }, () => {
-        chrome.tabs.query({}, (tabs) => {
-          tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'expansionsUpdated' }));
+      const scope = request.scope || 'global';
+      const domain = request.domain;
+      if (scope === 'domain' && domain) {
+        chrome.storage.sync.get(['expansions_domains'], (res) => {
+          const map = res.expansions_domains || {};
+          map[domain] = request.expansions;
+          chrome.storage.sync.set({ expansions_domains: map }, () => {
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'expansionsUpdated' }));
+            });
+            sendResponse({ success: true });
+          });
         });
-        sendResponse({ success: true });
-      });
+      } else {
+        chrome.storage.sync.set({ expansions: request.expansions }, () => {
+          chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'expansionsUpdated' }));
+          });
+          sendResponse({ success: true });
+        });
+      }
       return true; // Keep channel open for async response
     }
     
     if (request.action === 'saveShortcuts') {
-      chrome.storage.sync.set({ shortcuts: request.shortcuts }, () => {
-        chrome.tabs.query({}, (tabs) => {
-          tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'shortcutsUpdated' }));
+      const scope = request.scope || 'global';
+      const domain = request.domain;
+      if (scope === 'domain' && domain) {
+        chrome.storage.sync.get(['shortcuts_domains'], (res) => {
+          const map = res.shortcuts_domains || {};
+          map[domain] = request.shortcuts;
+          chrome.storage.sync.set({ shortcuts_domains: map }, () => {
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'shortcutsUpdated' }));
+            });
+            sendResponse({ success: true });
+          });
         });
-        sendResponse({ success: true });
-      });
+      } else {
+        chrome.storage.sync.set({ shortcuts: request.shortcuts }, () => {
+          chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'shortcutsUpdated' }));
+          });
+          sendResponse({ success: true });
+        });
+      }
       return true;
     }
 
     if (request.action === 'getExpansions') {
-      chrome.storage.sync.get(['expansions'], (result) => {
-        sendResponse({ expansions: result.expansions || [] });
-      });
+      const scope = request.scope || 'global';
+      const domain = request.domain;
+      if (scope === 'domain' && domain) {
+        chrome.storage.sync.get(['expansions_domains'], (res) => {
+          const list = (res.expansions_domains || {})[domain] || [];
+          sendResponse({ expansions: list });
+        });
+      } else {
+        chrome.storage.sync.get(['expansions'], (result) => {
+          sendResponse({ expansions: result.expansions || [] });
+        });
+      }
       return true;
     }
 
     if (request.action === 'getShortcuts') {
-      chrome.storage.sync.get(['shortcuts'], (result) => {
-        sendResponse({ shortcuts: result.shortcuts || [] });
+      const scope = request.scope || 'global';
+      const domain = request.domain;
+      if (scope === 'domain' && domain) {
+        chrome.storage.sync.get(['shortcuts_domains'], (res) => {
+          const list = (res.shortcuts_domains || {})[domain] || [];
+          sendResponse({ shortcuts: list });
+        });
+      } else {
+        chrome.storage.sync.get(['shortcuts'], (result) => {
+          sendResponse({ shortcuts: result.shortcuts || [] });
+        });
+      }
+      return true;
+    }
+
+    if (request.action === 'saveSettings') {
+      if (request.merge) {
+        // Merge new settings with existing ones
+        chrome.storage.sync.get(['settings'], (res) => {
+          const merged = Object.assign(res.settings || {}, request.settings);
+          chrome.storage.sync.set({ settings: merged }, () => {
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'settingsUpdated' }));
+            });
+            sendResponse({ success: true });
+          });
+        });
+      } else {
+        chrome.storage.sync.set({ settings: request.settings }, () => {
+          chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => sendMessageSafe(tab.id, { action: 'settingsUpdated' }));
+          });
+          sendResponse({ success: true });
+        });
+      }
+      return true;
+    }
+
+    if (request.action === 'getSettings') {
+      chrome.storage.sync.get(['settings'], (result) => {
+        sendResponse({ settings: result.settings || {} });
       });
       return true;
     }
