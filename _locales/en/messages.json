@@ -131,6 +131,12 @@
   "profileNamePrompt": {
     "message": "Enter a name for the new profile"
   },
+  "renameProfile": {
+    "message": "Rename profile"
+  },
+  "renameProfilePrompt": {
+    "message": "Enter a new name for the profile"
+  },
   "warning": {
     "message": "Warning"
   },

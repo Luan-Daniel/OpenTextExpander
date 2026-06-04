@@ -269,6 +269,22 @@ class PopupManager {
       case 'copy-profile':
         await this.copyCurrentProfile();
         break;
+      case 'rename-profile': {
+        const promptMessage = this.messages?.renameProfilePrompt?.message || 'Enter a new name for the profile';
+        const currentName = this.getActiveProfile()?.name || '';
+        const newName = window.prompt(promptMessage, currentName);
+        if (newName === null) return;
+        const trimmed = newName.trim();
+        if (!trimmed) return;
+
+        const response = await this.sendMessage({ action: 'saveProfileState', profileId: this.activeProfileId, updates: { name: trimmed } });
+        if (response) {
+          this.applyProfilesState(response);
+        } else {
+          await this.loadData();
+        }
+        break;
+      }
       case 'delete-profile':
         this.openConfirmation({
           title: this.messages?.deleteCurrentProfileWarningTitle?.message || 'Delete profile?',
@@ -728,6 +744,7 @@ class PopupManager {
       const menuText = {
         'add-profile': messages.addProfile?.message || 'Add profile',
         'copy-profile': messages.copyCurrentProfile?.message || 'Copy current profile',
+        'rename-profile': messages.renameProfile?.message || 'Rename profile',
         'delete-profile': messages.deleteCurrentProfile?.message || 'Delete current profile',
         'export-profile': messages.exportCurrentProfile?.message || 'Export current profile',
         'import-profiles': messages.importProfiles?.message || 'Import profile(s)',
