@@ -201,6 +201,7 @@ const getActiveProfileState = async () => {
 
 const saveProfilesState = async (profiles, activeProfileId) => {
   await storageSet({ profiles, activeProfileId });
+  void broadcastProfilesUpdated();
   return { success: true, profiles: Object.values(profiles), activeProfileId };
 };
 
