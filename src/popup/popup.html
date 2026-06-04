@@ -9,60 +9,70 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>OpenTextExpander</h2>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <span id="statusIndicator" style="font-size: 18px; cursor: help;" title="Loading...">⏳</span>
-                <button id="langSwitcher" class="lang-switcher">Lang: EN</button>
+            <div class="title-block">
+                <h2>OpenTextExpander <span id="statusIndicator" class="status-indicator" title="Loading...">⏳</span></h2>
+                <p class="subtitle">Manage profiles, expansions, and shortcuts</p>
+            </div>
+        </div>
+
+        <div class="profile-bar">
+            <label id="profileLabel" for="profileSelect" class="profile-label">Profiles</label>
+            <div class="profile-controls">
+                <select id="profileSelect" class="profile-select"></select>
+                <button id="addProfileBtn" class="icon-btn square-btn" type="button" title="Add profile">+</button>
+                <button id="profileMenuBtn" class="icon-btn menu-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Profile menu">⋯</button>
+            </div>
+            <div id="profileMenu" class="profile-menu" hidden>
+                <button type="button" data-action="add-profile"></button>
+                <button type="button" data-action="copy-profile"></button>
+                <button type="button" data-action="import-profiles"></button>
+                <button type="button" data-action="export-profile"></button>
+                <button type="button" data-action="export-all-profiles"></button>
+                <button type="button" data-action="delete-profile" class="danger"></button>
+                <button type="button" data-action="delete-all-profiles" class="danger"></button>
             </div>
         </div>
 
         <div class="tabs">
-            <button class="tab-button active" data-tab="expansions">Text Expansions</button>
-            <button class="tab-button" data-tab="shortcuts">Keyboard Shortcuts</button>
+            <button class="tab-button active" data-tab="expansions" type="button">Text Expansions</button>
+            <button class="tab-button" data-tab="shortcuts" type="button">Keyboard Shortcuts</button>
         </div>
 
-        <!-- Text Expansions Tab -->
         <div id="expansions" class="tab-content active">
             <div id="expansionsList" class="list">
                 <div class="empty-state">No expansions yet. Add one to get started!</div>
             </div>
 
             <div class="controls">
-                <button id="addExpansionBtn" class="btn btn-primary">+ Add Expansion</button>
+                <button id="addExpansionBtn" class="btn btn-primary" type="button">+ Add Expansion</button>
                 <label class="checkbox"><input type="checkbox" id="punctAware"> Punctuation aware</label>
                 <label class="checkbox"><input type="checkbox" id="caseSensitive"> Case sensitive</label>
             </div>
         </div>
 
-        <!-- Keyboard Shortcuts Tab -->
         <div id="shortcuts" class="tab-content">
             <div id="shortcutsList" class="list">
                 <div class="empty-state">No shortcuts yet. Add one to get started!</div>
             </div>
 
             <div class="controls">
-                <button id="addShortcutBtn" class="btn btn-primary">+ Add Shortcut</button>
+                <button id="addShortcutBtn" class="btn btn-primary" type="button">+ Add Shortcut</button>
             </div>
         </div>
 
-                <div class="utility-buttons">
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <label class="checkbox"><input type="checkbox" id="domainScope"> Per-domain settings</label>
-                            <span id="currentDomain" style="font-size:12px; color:#666;"></span>
-                        </div>
-                        <div style="display:flex; gap:8px;">
-                            <button id="importBtn" class="btn btn-secondary" type="button">Import</button>
-                            <button id="exportBtn" class="btn btn-secondary" type="button">Export</button>
-                            <a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>
-                            <a href="#" id="githubLink" class="btn btn-github">GitHub</a>
-                        </div>
-                </div>
+        <div class="utility-buttons">
+            <div class="utility-links">
+                <a href="#" id="testPageLink" class="btn btn-secondary">Test Page</a>
+                <a href="#" id="githubLink" class="btn btn-github">GitHub</a>
+            </div>
+        </div>
+
+        <button id="langSwitcher" class="lang-switcher" type="button">Lang: EN</button>
     </div>
 
-    <!-- Expansion Modal -->
     <div id="expansionModal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
+            <span class="close" data-close="expansionModal">&times;</span>
             <h2>Edit Expansion</h2>
             <form id="expansionForm">
                 <div class="form-group">
@@ -81,10 +91,9 @@
         </div>
     </div>
 
-    <!-- Shortcut Modal -->
     <div id="shortcutModal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
+            <span class="close" data-close="shortcutModal">&times;</span>
             <h2>Edit Shortcut</h2>
             <form id="shortcutForm">
                 <div class="form-group">
@@ -111,6 +120,18 @@
                     <button type="button" class="btn btn-secondary" id="deleteShortcutBtn">Delete</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content warning-modal">
+            <span class="close" data-close="confirmModal">&times;</span>
+            <h2 id="confirmTitle">Warning</h2>
+            <div id="confirmWarning" class="warning-box"></div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmActionBtn">Delete</button>
+            </div>
         </div>
     </div>
 

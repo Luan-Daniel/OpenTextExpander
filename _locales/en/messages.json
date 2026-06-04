@@ -97,5 +97,66 @@
   },
   "export": {
     "message": "Export"
+  },
+  "profileLabel": {
+    "message": "Profiles"
+  },
+  "profileMenu": {
+    "message": "Profile menu"
+  },
+  "addProfile": {
+    "message": "Add profile"
+  },
+  "copyCurrentProfile": {
+    "message": "Copy current profile"
+  },
+  "deleteCurrentProfile": {
+    "message": "Delete current profile"
+  },
+  "exportCurrentProfile": {
+    "message": "Export current profile"
+  },
+  "importProfiles": {
+    "message": "Import profile(s)"
+  },
+  "exportAllProfiles": {
+    "message": "Export all profiles"
+  },
+  "deleteAllProfiles": {
+    "message": "Delete all profiles"
+  },
+  "noProfiles": {
+    "message": "No profiles available"
+  },
+  "profileNamePrompt": {
+    "message": "Enter a name for the new profile"
+  },
+  "warning": {
+    "message": "Warning"
+  },
+  "deleteCurrentProfileWarningTitle": {
+    "message": "Delete current profile?"
+  },
+  "deleteCurrentProfileWarningBody": {
+    "message": "This will permanently delete the current profile and all of its expansions, shortcuts, and settings."
+  },
+  "deleteAllProfilesWarningTitle": {
+    "message": "Delete all profiles?"
+  },
+  "deleteAllProfilesWarningBody": {
+    "message": "This will permanently delete every profile and reset the extension to a single empty default profile."
+  },
+  "importProfilesSuccess": {
+    "message": "Profiles imported successfully."
+  },
+  "importProfilesFailed": {
+    "message": "Failed to import profiles:"
+  }
+  ,
+  "punctuationAwareTooltip": {
+    "message": "When enabled, punctuation is considered when matching triggers (e.g., commas, periods)."
+  },
+  "caseSensitiveTooltip": {
+    "message": "When enabled, triggers must match letter case exactly."
   }
 }

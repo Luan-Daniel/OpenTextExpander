@@ -97,5 +97,66 @@
   },
   "export": {
     "message": "Exportar"
+  },
+  "profileLabel": {
+    "message": "Perfiles"
+  },
+  "profileMenu": {
+    "message": "Menú de perfiles"
+  },
+  "addProfile": {
+    "message": "Agregar perfil"
+  },
+  "copyCurrentProfile": {
+    "message": "Copiar perfil actual"
+  },
+  "deleteCurrentProfile": {
+    "message": "Eliminar perfil actual"
+  },
+  "exportCurrentProfile": {
+    "message": "Exportar perfil actual"
+  },
+  "importProfiles": {
+    "message": "Importar perfil(es)"
+  },
+  "exportAllProfiles": {
+    "message": "Exportar todos los perfiles"
+  },
+  "deleteAllProfiles": {
+    "message": "Eliminar todos los perfiles"
+  },
+  "noProfiles": {
+    "message": "No hay perfiles disponibles"
+  },
+  "profileNamePrompt": {
+    "message": "Ingrese un nombre para el nuevo perfil"
+  },
+  "warning": {
+    "message": "Advertencia"
+  },
+  "deleteCurrentProfileWarningTitle": {
+    "message": "¿Eliminar el perfil actual?"
+  },
+  "deleteCurrentProfileWarningBody": {
+    "message": "Esto eliminará permanentemente el perfil actual y todas sus expansiones, atajos y configuraciones."
+  },
+  "deleteAllProfilesWarningTitle": {
+    "message": "¿Eliminar todos los perfiles?"
+  },
+  "deleteAllProfilesWarningBody": {
+    "message": "Esto eliminará permanentemente todos los perfiles y restablecerá la extensión a un único perfil predeterminado vacío."
+  },
+  "importProfilesSuccess": {
+    "message": "Perfiles importados correctamente."
+  },
+  "importProfilesFailed": {
+    "message": "Error al importar perfiles:"
+  }
+  ,
+  "punctuationAwareTooltip": {
+    "message": "Cuando está activado, se considera la puntuación al buscar disparadores (p. ej., comas, puntos)."
+  },
+  "caseSensitiveTooltip": {
+    "message": "Cuando está activado, los disparadores distinguen entre mayúsculas y minúsculas."
   }
 }

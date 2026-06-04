@@ -14,25 +14,25 @@ class ExpansionEngine {
     this.shortcuts = new Map();
 
     this.isReady = false;
-    this.settings = { caseSensitive: false };
+    this.settings = { caseSensitive: false, punctuationAware: false };
   }
 
   /**
    * Initialize engine with stored expansions and shortcuts
    * Loads both global and domain-scoped data for current page
    */
-  async initialize(domain = null) {
+  async initialize() {
     try {
       console.info('[Expander] Expansion engine init start');
-      const data = await this._getStorageData(domain);
+      const data = await this._getStorageData();
       this._buildTrie(data.expansions || []);
       this._buildShortcuts(data.shortcuts || []);
-      this.settings = Object.assign(this.settings, data.settings || {});
+      this.settings = Object.assign({ caseSensitive: false, punctuationAware: false }, data.settings || {});
       this.isReady = true;
       console.info('[Expander] Expansion engine ready', {
         expansions: this.expansions.size,
         shortcuts: this.shortcuts.size,
-        domain: domain || 'global'
+        profile: data.profileName || 'default'
       });
     } catch (error) {
       console.error('[!] Failed to initialize expansion engine:', error);
@@ -44,50 +44,41 @@ class ExpansionEngine {
    * Get data from storage (Chromium/Firefox compatible)
    * Loads domain-scoped data if domain is provided
    */
-  _getStorageData(domain = null) {
+  _getStorageData() {
     return new Promise((resolve) => {
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        // Get all storage keys to check for domain data
         chrome.storage.sync.get(null, (allData) => {
-          let expansions = allData?.expansions || [];
-          let shortcuts = allData?.shortcuts || [];
-          
-          // If domain is provided and domain scope is enabled, use domain-scoped data
-          if (domain && allData?.expansions_domains?.[domain]) {
-            expansions = allData.expansions_domains[domain];
-          }
-          if (domain && allData?.shortcuts_domains?.[domain]) {
-            shortcuts = allData.shortcuts_domains[domain];
-          }
-          
-          resolve({
-            expansions,
-            shortcuts,
-            settings: allData?.settings || {}
-          });
+          resolve(this._extractProfileData(allData));
         });
       } else if (typeof browser !== 'undefined' && browser.storage) {
         browser.storage.sync.get().then(allData => {
-          let expansions = allData?.expansions || [];
-          let shortcuts = allData?.shortcuts || [];
-          
-          if (domain && allData?.expansions_domains?.[domain]) {
-            expansions = allData.expansions_domains[domain];
-          }
-          if (domain && allData?.shortcuts_domains?.[domain]) {
-            shortcuts = allData.shortcuts_domains[domain];
-          }
-          
-          resolve({
-            expansions,
-            shortcuts,
-            settings: allData?.settings || {}
-          });
+          resolve(this._extractProfileData(allData));
         });
       } else {
         resolve({});
       }
     });
+  }
+
+  _extractProfileData(allData) {
+    if (allData?.profiles && typeof allData.profiles === 'object' && !Array.isArray(allData.profiles)) {
+      const profiles = allData.profiles;
+      const activeProfileId = profiles[allData.activeProfileId] ? allData.activeProfileId : Object.keys(profiles)[0];
+      const profile = profiles[activeProfileId] || {};
+
+      return {
+        expansions: profile.expansions || [],
+        shortcuts: profile.shortcuts || [],
+        settings: profile.settings || {},
+        profileName: profile.name || 'default'
+      };
+    }
+
+    return {
+      expansions: allData?.expansions || [],
+      shortcuts: allData?.shortcuts || [],
+      settings: allData?.settings || {}
+    };
   }
 
   /**
@@ -200,7 +191,7 @@ class ExpansionEngine {
    */
   async updateExpansions(expansions) {
     this._buildTrie(expansions);
-    await this._saveToStorage('expansions', expansions);
+    await this._saveActiveProfileField('expansions', expansions);
   }
 
   /**
@@ -208,7 +199,7 @@ class ExpansionEngine {
    */
   async updateShortcuts(shortcuts) {
     this._buildShortcuts(shortcuts);
-    await this._saveToStorage('shortcuts', shortcuts);
+    await this._saveActiveProfileField('shortcuts', shortcuts);
   }
 
   /**
@@ -225,6 +216,24 @@ class ExpansionEngine {
       } else {
         resolve();
       }
+    });
+  }
+
+  _saveActiveProfileField(field, value) {
+    return new Promise((resolve) => {
+      const payload = { action: 'saveProfileState', updates: { [field]: value } };
+
+      if (typeof chrome !== 'undefined' && chrome.runtime) {
+        chrome.runtime.sendMessage(payload, () => resolve());
+        return;
+      }
+
+      if (typeof browser !== 'undefined' && browser.runtime) {
+        browser.runtime.sendMessage(payload).then(() => resolve()).catch(() => resolve());
+        return;
+      }
+
+      resolve();
     });
   }
 }

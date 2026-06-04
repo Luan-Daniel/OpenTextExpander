@@ -1,17 +1,19 @@
 /**
- * Popup script - manage expansions and shortcuts UI
+ * Popup script - manage profiles, expansions, and shortcuts UI
  */
 
 class PopupManager {
   constructor() {
-    this.expansions = [];
-    this.shortcuts = [];
-    this.editingExpansionIndex = null;
-    this.editingShortcutIndex = null;
+    this.profiles = [];
+    this.activeProfileId = null;
+    this.currentProfile = null;
     this.currentLanguage = 'en';
     this.extensionReady = false;
     this.contentScriptReady = false;
-    
+    this.messages = {};
+    this.pendingConfirmation = null;
+    this.profileMenuOpen = false;
+
     this.setupElements();
     this.attachListeners();
     this.loadLanguage();
@@ -20,533 +22,459 @@ class PopupManager {
   }
 
   setupElements() {
-    // Status indicator
     this.statusIndicator = document.getElementById('statusIndicator');
-    
-    // Language switcher
     this.langSwitcher = document.getElementById('langSwitcher');
-    
-    // Tab buttons
     this.tabButtons = document.querySelectorAll('.tab-button');
-    
-    // Lists
+
+    this.profileLabel = document.getElementById('profileLabel');
+    this.profileSelect = document.getElementById('profileSelect');
+    this.addProfileBtn = document.getElementById('addProfileBtn');
+    this.profileMenuBtn = document.getElementById('profileMenuBtn');
+    this.profileMenu = document.getElementById('profileMenu');
+    this.profileMenuItems = this.profileMenu ? this.profileMenu.querySelectorAll('button[data-action]') : [];
+
     this.expansionsList = document.getElementById('expansionsList');
     this.shortcutsList = document.getElementById('shortcutsList');
-    
-    // Buttons
+
     this.addExpansionBtn = document.getElementById('addExpansionBtn');
     this.addShortcutBtn = document.getElementById('addShortcutBtn');
     this.testPageLink = document.getElementById('testPageLink');
     this.githubLink = document.getElementById('githubLink');
-    this.importBtn = document.getElementById('importBtn');
-    this.exportBtn = document.getElementById('exportBtn');
-    this.domainScope = document.getElementById('domainScope');
-    this.currentDomainEl = document.getElementById('currentDomain');
     this.punctAware = document.getElementById('punctAware');
     this.caseSensitive = document.getElementById('caseSensitive');
-    
-    // Modals
+
     this.expansionModal = document.getElementById('expansionModal');
     this.shortcutModal = document.getElementById('shortcutModal');
-    
-    // Forms
+    this.confirmModal = document.getElementById('confirmModal');
+
     this.expansionForm = document.getElementById('expansionForm');
     this.shortcutForm = document.getElementById('shortcutForm');
-    
-    // Form fields
+
     this.expansionTrigger = document.getElementById('expansionTrigger');
     this.expansionReplacement = document.getElementById('expansionReplacement');
     this.deleteExpansionBtn = document.getElementById('deleteExpansionBtn');
-    
+
     this.ctrlKey = document.getElementById('ctrlKey');
     this.shiftKey = document.getElementById('shiftKey');
     this.altKey = document.getElementById('altKey');
     this.mainKey = document.getElementById('mainKey');
     this.shortcutText = document.getElementById('shortcutText');
     this.deleteShortcutBtn = document.getElementById('deleteShortcutBtn');
-    
-    // Close buttons
+
+    this.confirmTitle = document.getElementById('confirmTitle');
+    this.confirmWarning = document.getElementById('confirmWarning');
+    this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    this.confirmActionBtn = document.getElementById('confirmActionBtn');
+
     this.closeButtons = document.querySelectorAll('.close');
   }
 
   attachListeners() {
-    // Language switcher
     this.langSwitcher.addEventListener('click', () => this.switchLanguage());
-    
-    // Tab switching
-    this.tabButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+
+    this.tabButtons.forEach((btn) => {
+      btn.addEventListener('click', (event) => this.switchTab(event.target.dataset.tab));
     });
 
-    // Add buttons
+    this.profileSelect.addEventListener('change', () => this.switchProfile(this.profileSelect.value));
+    this.addProfileBtn.addEventListener('click', () => this.createProfile());
+    this.profileMenuBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleProfileMenu();
+    });
+
+    this.profileMenuItems.forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.handleProfileMenuAction(item.dataset.action);
+      });
+    });
+
     this.addExpansionBtn.addEventListener('click', () => this.openExpansionModal());
     this.addShortcutBtn.addEventListener('click', () => this.openShortcutModal());
-    this.importBtn.addEventListener('click', () => this.importSettings());
-    this.exportBtn.addEventListener('click', () => this.exportSettings());
-    this.domainScope.addEventListener('change', () => this.toggleScope());
-    this.punctAware.addEventListener('change', () => this.saveSettings());
-    this.caseSensitive.addEventListener('change', () => this.saveSettings());
+    this.punctAware.addEventListener('change', () => this.saveCurrentSettings());
+    this.caseSensitive.addEventListener('change', () => this.saveCurrentSettings());
 
-    // Test page links
-    this.testPageLink.addEventListener('click', (e) => {
-      e.preventDefault();
+    this.testPageLink.addEventListener('click', (event) => {
+      event.preventDefault();
       this.openTestPage();
     });
-    this.githubLink.addEventListener('click', (e) => {
-      e.preventDefault();
+
+    this.githubLink.addEventListener('click', (event) => {
+      event.preventDefault();
       this.openGitHubPage();
     });
 
-    // Forms
-    this.expansionForm.addEventListener('submit', (e) => this.saveExpansion(e));
-    this.shortcutForm.addEventListener('submit', (e) => this.saveShortcut(e));
-
-    // Delete buttons
+    this.expansionForm.addEventListener('submit', (event) => this.saveExpansion(event));
+    this.shortcutForm.addEventListener('submit', (event) => this.saveShortcut(event));
     this.deleteExpansionBtn.addEventListener('click', () => this.deleteExpansion());
     this.deleteShortcutBtn.addEventListener('click', () => this.deleteShortcut());
 
-    // Close modals
-    this.closeButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const modal = e.target.closest('.modal');
+    this.confirmCancelBtn.addEventListener('click', () => this.closeModal(this.confirmModal));
+    this.confirmActionBtn.addEventListener('click', () => this.runConfirmationAction());
+
+    this.closeButtons.forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        const modal = event.target.closest('.modal');
         this.closeModal(modal);
       });
     });
 
-    // Close modal on outside click
-    window.addEventListener('click', (e) => {
-      if (e.target.classList.contains('modal')) {
-        this.closeModal(e.target);
+    window.addEventListener('click', (event) => {
+      if (event.target.classList.contains('modal')) {
+        this.closeModal(event.target);
+      }
+
+      if (!event.target.closest('.profile-bar')) {
+        this.closeProfileMenu();
       }
     });
   }
 
-  /**
-   * Open the test page in a new tab
-   */
-  openTestPage() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    
-    if (!chrome_api) return;
-
-    // Get extension URL and create test page path
-    const testPageUrl = chrome_api.runtime.getURL('src/debug/test-page.html');
-    
-    // Open in new tab
-    if (chrome_api.tabs) {
-      chrome_api.tabs.create({ url: testPageUrl });
-    } else if (chrome_api.windows) {
-      // Firefox fallback
-      chrome_api.windows.openDefaultBrowser?.(testPageUrl);
-    }
+  getApi() {
+    return typeof chrome !== 'undefined' ? chrome : typeof browser !== 'undefined' ? browser : null;
   }
 
-  openGitHubPage() {
-    const githubUrl = 'https://github.com/Luan-Daniel/OpenTextExpander';
-    window.open(githubUrl, '_blank');
+  sendMessage(message) {
+    const api = this.getApi();
+    if (!api?.runtime?.sendMessage) {
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage(message, (response) => {
+            if (chrome.runtime.lastError) {
+              resolve(null);
+              return;
+            }
+            resolve(response || null);
+          });
+          return;
+        }
+
+        const result = browser.runtime.sendMessage(message);
+        if (result && typeof result.then === 'function') {
+          result.then(resolve).catch(() => resolve(null));
+        } else {
+          resolve(result || null);
+        }
+      } catch {
+        resolve(null);
+      }
+    });
   }
 
   async loadData() {
     try {
-      const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                        typeof browser !== 'undefined' ? browser : null;
-      
-      if (!chrome_api) return;
-
-      // Restore scope preference
-      const savedScope = localStorage.getItem('crapless_domainScope') === 'true';
-      if (this.domainScope) {
-        this.domainScope.checked = savedScope;
+      const response = await this.sendMessage({ action: 'getProfilesState' });
+      if (response) {
+        this.applyProfilesState(response);
       }
-
-      // Resolve current active tab domain (must be async)
-      const domain = await new Promise((resolve) => {
-        chrome_api.tabs?.query({ active: true, currentWindow: true }, (tabs) => {
-          const url = tabs && tabs[0]?.url;
-          try {
-            const hostname = url ? new URL(url).hostname : '';
-            this.currentDomain = hostname;
-            if (this.currentDomainEl) this.currentDomainEl.textContent = hostname ? `Domain: ${hostname}` : '';
-            resolve(hostname);
-          } catch {
-            resolve('');
-          }
-        });
-      });
-
-      const scope = this.domainScope?.checked ? 'domain' : 'global';
-
-      // Load expansions
-      chrome_api.runtime.sendMessage(
-        { action: 'getExpansions', scope, domain },
-        (response) => {
-          if (response) {
-            this.expansions = response.expansions || [];
-            this.renderExpansions();
-          }
-        }
-      );
-
-      // Load shortcuts
-      chrome_api.runtime.sendMessage(
-        { action: 'getShortcuts', scope, domain },
-        (response) => {
-          if (response) {
-            this.shortcuts = response.shortcuts || [];
-            this.renderShortcuts();
-          }
-        }
-      );
-
-      // Load settings
-      chrome_api.runtime.sendMessage(
-        { action: 'getSettings' },
-        (response) => {
-          const settings = response?.settings || {};
-          this.punctAware.checked = !!settings.punctuationAware;
-          this.caseSensitive.checked = !!settings.caseSensitive;
-        }
-      );
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load profile data:', error);
     }
   }
 
-  switchTab(tabName) {
-    // Update active tab button
-    this.tabButtons.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tabName);
-    });
+  applyProfilesState(state) {
+    this.profiles = Array.isArray(state?.profiles) ? state.profiles : [];
+    this.activeProfileId = state?.activeProfileId || this.profiles[0]?.id || null;
+    this.currentProfile = this.profiles.find((profile) => profile.id === this.activeProfileId) || this.profiles[0] || this.createEmptyProfile();
 
-    // Update active content
-    document.querySelectorAll('.tab-content').forEach(content => {
-      content.classList.remove('active');
-    });
-    document.getElementById(tabName).classList.add('active');
+    this.renderProfileSelect();
+    this.applyCurrentProfileToUI();
+    this.renderExpansions();
+    this.renderShortcuts();
   }
 
-  // Save settings (punctuation aware, case sensitive)
-  saveSettings() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    if (!chrome_api) return;
-    const settings = {
-      punctuationAware: this.punctAware.checked,
-      caseSensitive: this.caseSensitive.checked
+  createEmptyProfile() {
+    return {
+      id: null,
+      name: '',
+      expansions: [],
+      shortcuts: [],
+      settings: {},
     };
-    chrome_api.runtime.sendMessage({ action: 'saveSettings', settings }, () => {
-      // Broadcast to all tabs to reload engine
-      chrome_api.tabs?.query({}, (tabs) => {
-        tabs?.forEach(tab => {
-          chrome_api.tabs.sendMessage(tab.id, { action: 'settingsUpdated' }, () => {
-            void chrome_api.runtime.lastError;
-          });
+  }
+
+  renderProfileSelect() {
+    if (!this.profileSelect) return;
+
+    this.profileSelect.innerHTML = '';
+
+    if (this.profiles.length === 0) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = this.messages?.noProfiles?.message || 'No profiles available';
+      this.profileSelect.appendChild(option);
+      this.profileSelect.disabled = true;
+      this.addProfileBtn.disabled = false;
+      this.profileMenuBtn.disabled = false;
+      return;
+    }
+
+    this.profileSelect.disabled = false;
+    this.profiles.forEach((profile) => {
+      const option = document.createElement('option');
+      option.value = profile.id;
+      option.textContent = profile.name;
+      this.profileSelect.appendChild(option);
+    });
+
+    this.profileSelect.value = this.activeProfileId || this.profiles[0].id;
+  }
+
+  applyCurrentProfileToUI() {
+    const settings = this.currentProfile?.settings || {};
+    if (this.punctAware) this.punctAware.checked = !!settings.punctuationAware;
+    if (this.caseSensitive) this.caseSensitive.checked = !!settings.caseSensitive;
+  }
+
+  getActiveProfile() {
+    return this.profiles.find((profile) => profile.id === this.activeProfileId) || this.currentProfile || this.createEmptyProfile();
+  }
+
+  async switchProfile(profileId) {
+    if (!profileId || profileId === this.activeProfileId) {
+      return;
+    }
+
+    await this.sendMessage({ action: 'setActiveProfile', profileId });
+    await this.loadData();
+  }
+
+  toggleProfileMenu(forceOpen = null) {
+    const shouldOpen = forceOpen === null ? this.profileMenu.hidden : forceOpen;
+    this.profileMenu.hidden = !shouldOpen;
+    this.profileMenuOpen = shouldOpen;
+    this.profileMenuBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  }
+
+  closeProfileMenu() {
+    if (this.profileMenu) {
+      this.profileMenu.hidden = true;
+      this.profileMenuOpen = false;
+      this.profileMenuBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  async handleProfileMenuAction(action) {
+    this.closeProfileMenu();
+
+    switch (action) {
+      case 'add-profile':
+        await this.createProfile();
+        break;
+      case 'copy-profile':
+        await this.copyCurrentProfile();
+        break;
+      case 'delete-profile':
+        this.openConfirmation({
+          title: this.messages?.deleteCurrentProfileWarningTitle?.message || 'Delete profile?',
+          message: this.messages?.deleteCurrentProfileWarningBody?.message || 'This will permanently delete the current profile and all of its expansions, shortcuts, and settings.',
+          actionLabel: this.messages?.deleteCurrentProfile?.message || 'Delete current profile',
+          onConfirm: async () => {
+            await this.sendMessage({ action: 'deleteCurrentProfile', profileId: this.activeProfileId });
+            await this.loadData();
+          },
         });
-      });
-    });
+        break;
+      case 'export-profile':
+        this.exportCurrentProfile();
+        break;
+      case 'import-profiles':
+        await this.importProfiles();
+        break;
+      case 'export-all-profiles':
+        this.exportAllProfiles();
+        break;
+      case 'delete-all-profiles':
+        this.openConfirmation({
+          title: this.messages?.deleteAllProfilesWarningTitle?.message || 'Delete all profiles?',
+          message: this.messages?.deleteAllProfilesWarningBody?.message || 'This will permanently delete every profile and reset the extension to a single empty default profile.',
+          actionLabel: this.messages?.deleteAllProfiles?.message || 'Delete all profiles',
+          onConfirm: async () => {
+            await this.sendMessage({ action: 'deleteAllProfiles' });
+            await this.loadData();
+          },
+        });
+        break;
+      default:
+        break;
+    }
   }
 
-  // Scope toggle: reload data with new scope
-  toggleScope() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    if (!chrome_api) return;
-
-    const checked = this.domainScope.checked;
-    this.currentDomainEl.textContent = checked ? window.location.hostname : '';
-    
-    // Persist scope preference to localStorage
-    localStorage.setItem('crapless_domainScope', checked ? 'true' : 'false');
-    
-    // Persist scope to storage.sync so content scripts can see it
-    chrome_api.runtime.sendMessage(
-      { 
-        action: 'saveSettings', 
-        settings: { 
-          domainScope: checked 
-        },
-        merge: true // Signal to merge with existing settings
-      },
-      () => {
-        // Reload data with new scope
-        this.loadData();
-      }
-    );
+  openConfirmation({ title, message, actionLabel, onConfirm }) {
+    this.pendingConfirmation = onConfirm;
+    this.confirmTitle.textContent = title;
+    this.confirmWarning.textContent = message;
+    this.confirmActionBtn.textContent = actionLabel;
+    this.openModal(this.confirmModal);
   }
 
-  /**
-   * Export all settings (global + domain-specific) to JSON file
-   */
-  exportSettings() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    if (!chrome_api) return;
-
-    // Get all data at once
-    chrome_api.storage?.sync?.get(null, (allData) => {
-      const backup = {
-        version: 1,
-        exportDate: new Date().toISOString(),
-        global: {
-          expansions: allData?.expansions || [],
-          shortcuts: allData?.shortcuts || [],
-          settings: allData?.settings || {}
-        },
-        domains: {
-          expansions: allData?.expansions_domains || {},
-          shortcuts: allData?.shortcuts_domains || {}
-        }
-      };
-
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `open-text-expander-backup-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+  async runConfirmationAction() {
+    if (typeof this.pendingConfirmation === 'function') {
+      const action = this.pendingConfirmation;
+      this.pendingConfirmation = null;
+      this.closeModal(this.confirmModal);
+      await action();
+    }
   }
 
-  /**
-   * Import all settings from JSON backup file
-   */
-  importSettings() {
+  async createProfile() {
+    const promptMessage = this.messages?.profileNamePrompt?.message || 'Enter a name for the new profile';
+    const profileName = window.prompt(promptMessage, 'New profile');
+    if (profileName === null) return;
+
+    const trimmed = profileName.trim();
+    if (!trimmed) return;
+
+    const response = await this.sendMessage({ action: 'createProfile', name: trimmed });
+    if (response) {
+      this.applyProfilesState(response);
+    } else {
+      await this.loadData();
+    }
+  }
+
+  async copyCurrentProfile() {
+    const response = await this.sendMessage({ action: 'copyCurrentProfile' });
+    if (response) {
+      this.applyProfilesState(response);
+    } else {
+      await this.loadData();
+    }
+  }
+
+  exportCurrentProfile() {
+    const profile = this.getActiveProfile();
+    if (!profile?.id) return;
+
+    const payload = {
+      version: 2,
+      profile,
+    };
+
+    this.downloadJson(payload, `${this.slugify(profile.name || 'profile')}.json`);
+  }
+
+  exportAllProfiles() {
+    const payload = {
+      version: 2,
+      activeProfileId: this.activeProfileId,
+      profiles: this.profiles,
+    };
+
+    this.downloadJson(payload, 'crapless-expander-profiles.json');
+  }
+
+  async importProfiles() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json';
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
+
       try {
         const text = await file.text();
-        const backup = JSON.parse(text);
+        const data = JSON.parse(text);
+        const response = await this.sendMessage({ action: 'importProfiles', data });
 
-        const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                          typeof browser !== 'undefined' ? browser : null;
-        if (!chrome_api) return;
-
-        const updates = {};
-
-        // Restore global data
-        if (backup.global) {
-          if (Array.isArray(backup.global.expansions)) {
-            updates.expansions = backup.global.expansions;
-          }
-          if (Array.isArray(backup.global.shortcuts)) {
-            updates.shortcuts = backup.global.shortcuts;
-          }
-          if (backup.global.settings && typeof backup.global.settings === 'object') {
-            updates.settings = backup.global.settings;
-          }
+        if (response) {
+          this.applyProfilesState(response);
+          alert(this.messages?.importProfilesSuccess?.message || 'Profiles imported successfully.');
+        } else {
+          await this.loadData();
+          alert(this.messages?.importProfilesSuccess?.message || 'Profiles imported successfully.');
         }
-
-        // Restore domain data
-        if (backup.domains) {
-          if (backup.domains.expansions && typeof backup.domains.expansions === 'object') {
-            updates.expansions_domains = backup.domains.expansions;
-          }
-          if (backup.domains.shortcuts && typeof backup.domains.shortcuts === 'object') {
-            updates.shortcuts_domains = backup.domains.shortcuts;
-          }
-        }
-
-        // Save all updates
-        chrome_api.storage?.sync?.set(updates, () => {
-          // Reload current popup
-          this.loadData();
-          alert('All settings imported successfully!');
-        });
-      } catch (e) {
-        alert('Invalid backup file: ' + e.message);
+      } catch (error) {
+        alert(`${this.messages?.importProfilesFailed?.message || 'Failed to import profiles:'} ${error.message}`);
       }
     };
     input.click();
   }
 
-  /**
-   * Load the saved language preference
-   */
-  loadLanguage() {
-    const saved = localStorage.getItem('crapless_language') || 'en';
-    this.currentLanguage = saved;
-    this.updateLanguageButton();
-    this.applyTranslations();
+  downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
-  /**
-   * Cycle through languages: EN -> PT -> ES -> EN
-   */
-  switchLanguage() {
-    const languages = ['en', 'pt', 'es'];
-    const currentIndex = languages.indexOf(this.currentLanguage);
-    const nextIndex = (currentIndex + 1) % languages.length;
-    this.currentLanguage = languages[nextIndex];
-    
-    localStorage.setItem('crapless_language', this.currentLanguage);
-    this.updateLanguageButton();
-    this.applyTranslations();
+  slugify(text) {
+    return String(text)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
-  /**
-   * Update the language button text
-   */
-  updateLanguageButton() {
-    const langMap = { en: 'EN', pt: 'PT', es: 'ES' };
-    this.langSwitcher.textContent = `Lang: ${langMap[this.currentLanguage]}`;
-  }
+  async saveCurrentSettings() {
+    const currentSettings = this.currentProfile?.settings || {};
+    const nextSettings = {
+      ...currentSettings,
+      punctuationAware: !!this.punctAware.checked,
+      caseSensitive: !!this.caseSensitive.checked,
+    };
 
-  /**
-   * Apply translations to all UI elements
-   */
-  async applyTranslations() {
-    try {
-      const response = await fetch(`/_locales/${this.currentLanguage}/messages.json`);
-      const messages = await response.json();
-      
-      // Update tab buttons
-      const tabButtons = document.querySelectorAll('.tab-button');
-      if (tabButtons[0]) tabButtons[0].textContent = messages.textExpansions.message;
-      if (tabButtons[1]) tabButtons[1].textContent = messages.keyboardShortcuts.message;
-      
-      // Update buttons
-      if (this.addExpansionBtn) this.addExpansionBtn.textContent = messages.addExpansion.message;
-      if (this.addShortcutBtn) this.addShortcutBtn.textContent = messages.addShortcut.message;
-      if (this.importBtn) this.importBtn.textContent = messages.import.message;
-      if (this.exportBtn) this.exportBtn.textContent = messages.export.message;
-      if (this.testPageLink) this.testPageLink.textContent = messages.testPage.message;
-      if (this.githubLink) this.githubLink.textContent = messages.repoLink.message;
-      
-      // Update modal titles (using h2, not h3)
-      const expansionModalTitle = document.querySelector('#expansionModal h2');
-      const shortcutModalTitle = document.querySelector('#shortcutModal h2');
-      if (expansionModalTitle) expansionModalTitle.textContent = messages.editExpansion.message;
-      if (shortcutModalTitle) shortcutModalTitle.textContent = messages.editShortcut.message;
-      
-      // Update form labels
-      const triggerLabel = document.querySelector('label[for="expansionTrigger"]');
-      const replacementLabel = document.querySelector('label[for="expansionReplacement"]');
-      const keysLabel = document.querySelector('#shortcutModal .form-group label');
-      const textLabel = document.querySelector('label[for="shortcutText"]');
-      
-      if (triggerLabel) triggerLabel.textContent = messages.trigger.message;
-      if (replacementLabel) replacementLabel.textContent = messages.replacement.message;
-      if (keysLabel) keysLabel.textContent = messages.keys.message;
-      if (textLabel) textLabel.textContent = messages.textToInsert.message;
-      
-      // Update placeholders
-      if (this.expansionTrigger) this.expansionTrigger.placeholder = messages.triggerPlaceholder.message;
-      if (this.expansionReplacement) this.expansionReplacement.placeholder = messages.replacementPlaceholder.message;
-      if (this.mainKey) this.mainKey.placeholder = messages.keyPlaceholder.message;
-      
-      // Update Save button labels in modals
-      const saveButtons = document.querySelectorAll('.btn-primary[type="submit"]');
-      saveButtons.forEach(btn => {
-        btn.textContent = messages.save.message;
-      });
-      
-      // Update Delete button labels in modals
-      const deleteButtons = document.querySelectorAll('.btn-secondary[type="button"]');
-      deleteButtons.forEach(btn => {
-        if (btn.id === 'deleteExpansionBtn' || btn.id === 'deleteShortcutBtn') {
-          btn.textContent = messages.delete.message;
-        }
-      });
-      
-      // Update settings checkboxes
-      const punctAwareLabel = document.querySelector('label:has(#punctAware)');
-      const caseSensitiveLabel = document.querySelector('label:has(#caseSensitive)');
-      const domainScopeLabel = document.querySelector('label:has(#domainScope)');
-      
-      if (punctAwareLabel) {
-        const checkbox = punctAwareLabel.querySelector('input');
-        punctAwareLabel.textContent = '';
-        punctAwareLabel.appendChild(checkbox);
-        punctAwareLabel.appendChild(document.createTextNode(` ${messages.punctuationAware.message}`));
-      }
-      if (caseSensitiveLabel) {
-        const checkbox = caseSensitiveLabel.querySelector('input');
-        caseSensitiveLabel.textContent = '';
-        caseSensitiveLabel.appendChild(checkbox);
-        caseSensitiveLabel.appendChild(document.createTextNode(` ${messages.caseSensitive.message}`));
-      }
-      if (domainScopeLabel) {
-        const checkbox = domainScopeLabel.querySelector('input');
-        domainScopeLabel.textContent = '';
-        domainScopeLabel.appendChild(checkbox);
-        domainScopeLabel.appendChild(document.createTextNode(` ${messages.perDomainSettings.message}`));
-      }
-      
-      // Re-render lists to update empty states
-      this.renderExpansions();
-      this.renderShortcuts();
-      
-      // Store messages for later use
-      this.messages = messages;
-    } catch (error) {
-      console.error('Failed to load translations:', error);
+    const response = await this.sendMessage({
+      action: 'saveProfileState',
+      profileId: this.activeProfileId,
+      updates: { settings: nextSettings },
+    });
+
+    if (response?.profiles) {
+      this.applyProfilesState(response);
+    } else {
+      this.currentProfile.settings = nextSettings;
     }
   }
 
-  renderExpansions() {
-    if (this.expansions.length === 0) {
-      const emptyMsg = this.messages?.noExpansions?.message || 'No expansions yet. Add one to get started!';
-      this.expansionsList.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
-      return;
-    }
-
-    const editLabel = this.messages?.edit?.message || 'Edit';
-    
-    this.expansionsList.innerHTML = this.expansions.map((exp, index) => `
-      <div class="list-item" data-index="${index}">
-        <div class="list-item-content">
-          <div class="list-item-trigger">${this.escapeHtml(exp.trigger)}</div>
-          <div class="list-item-value">${this.escapeHtml(exp.replacement)}</div>
-        </div>
-        <div class="list-item-actions">
-          <button class="list-item-edit" data-index="${index}">${editLabel}</button>
-        </div>
-      </div>
-    `).join('');
-
-    // Attach edit listeners
-    this.expansionsList.querySelectorAll('.list-item-edit').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.editExpansion(parseInt(btn.dataset.index));
-      });
+  saveCurrentProfile(updates = {}) {
+    return this.sendMessage({
+      action: 'saveProfileState',
+      profileId: this.activeProfileId,
+      updates,
+    }).then((response) => {
+      if (response?.profiles) {
+        this.applyProfilesState(response);
+      }
+      return response;
     });
   }
 
-  renderShortcuts() {
-    if (this.shortcuts.length === 0) {
-      const emptyMsg = this.messages?.noShortcuts?.message || 'No shortcuts yet. Add one to get started!';
-      this.shortcutsList.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
-      return;
+  async openTestPage() {
+    const api = this.getApi();
+    if (!api) return;
+
+    const testPageUrl = api.runtime.getURL('src/debug/test-page.html');
+    if (api.tabs?.create) {
+      api.tabs.create({ url: testPageUrl });
     }
+  }
 
-    const editLabel = this.messages?.edit?.message || 'Edit';
-    
-    this.shortcutsList.innerHTML = this.shortcuts.map((shortcut, index) => `
-      <div class="list-item" data-index="${index}">
-        <div class="list-item-content">
-          <div class="list-item-trigger">${this.escapeHtml(shortcut.keys)}</div>
-          <div class="list-item-value">${this.escapeHtml(shortcut.text)}</div>
-        </div>
-        <div class="list-item-actions">
-          <button class="list-item-edit" data-index="${index}">${editLabel}</button>
-        </div>
-      </div>
-    `).join('');
+  openGitHubPage() {
+    window.open('https://github.com/Luan-Daniel/OpenTextExpander', '_blank');
+  }
 
-    // Attach edit listeners
-    this.shortcutsList.querySelectorAll('.list-item-edit').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.editShortcut(parseInt(btn.dataset.index));
-      });
+  switchTab(tabName) {
+    this.tabButtons.forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
+
+    document.querySelectorAll('.tab-content').forEach((content) => {
+      content.classList.remove('active');
+    });
+
+    const activeTab = document.getElementById(tabName);
+    if (activeTab) {
+      activeTab.classList.add('active');
+    }
   }
 
   openExpansionModal() {
@@ -559,27 +487,29 @@ class PopupManager {
 
   editExpansion(index) {
     this.editingExpansionIndex = index;
-    const exp = this.expansions[index];
-    this.expansionTrigger.value = exp.trigger;
-    this.expansionReplacement.value = exp.replacement;
+    const expansion = this.currentProfile.expansions[index];
+    if (!expansion) return;
+
+    this.expansionTrigger.value = expansion.trigger;
+    this.expansionReplacement.value = expansion.replacement;
     this.deleteExpansionBtn.style.display = 'block';
     this.openModal(this.expansionModal);
   }
 
-  saveExpansion(e) {
-    e.preventDefault();
+  async saveExpansion(event) {
+    event.preventDefault();
 
     const trigger = this.expansionTrigger.value.trim();
     const replacement = this.expansionReplacement.value.trim();
 
     if (!trigger || !replacement) {
-      const msg = this.messages?.fillBothFields?.message || 'Please fill in both fields';
-      alert(msg);
+      alert(this.messages?.fillBothFields?.message || 'Please fill in both fields');
       return;
     }
 
-    // Prevent duplicates: offer overwrite or cancel
-    const existingIndex = this.expansions.findIndex(exp => exp.trigger === trigger);
+    const expansions = [...(this.currentProfile.expansions || [])];
+    const existingIndex = expansions.findIndex((item) => item.trigger === trigger);
+
     if (existingIndex !== -1 && existingIndex !== this.editingExpansionIndex) {
       const overwrite = confirm(`Trigger "${trigger}" already exists. Overwrite?`);
       if (!overwrite) return;
@@ -587,38 +517,28 @@ class PopupManager {
     }
 
     if (this.editingExpansionIndex === null) {
-      this.expansions.push({ trigger, replacement });
+      expansions.push({ trigger, replacement });
     } else {
-      this.expansions[this.editingExpansionIndex] = { trigger, replacement };
+      expansions[this.editingExpansionIndex] = { trigger, replacement };
     }
 
-    this.saveExpansionsToStorage();
+    this.currentProfile.expansions = expansions;
+    this.currentProfile = { ...this.currentProfile, expansions };
     this.renderExpansions();
     this.closeModal(this.expansionModal);
+    await this.saveCurrentProfile({ expansions });
   }
 
-  deleteExpansion() {
-    if (this.editingExpansionIndex !== null) {
-      this.expansions.splice(this.editingExpansionIndex, 1);
-      this.saveExpansionsToStorage();
-      this.renderExpansions();
-      this.closeModal(this.expansionModal);
-    }
-  }
+  async deleteExpansion() {
+    if (this.editingExpansionIndex === null) return;
 
-  saveExpansionsToStorage() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    
-    if (!chrome_api) return;
-    chrome_api.runtime.sendMessage(
-      { action: 'saveExpansions', expansions: this.expansions, scope: this.domainScope?.checked ? 'domain' : 'global', domain: this.currentDomain },
-      (response) => {
-        if (response?.success) {
-          console.log('Expansions saved');
-        }
-      }
-    );
+    const expansions = [...(this.currentProfile.expansions || [])];
+    expansions.splice(this.editingExpansionIndex, 1);
+    this.currentProfile.expansions = expansions;
+    this.currentProfile = { ...this.currentProfile, expansions };
+    this.renderExpansions();
+    this.closeModal(this.expansionModal);
+    await this.saveCurrentProfile({ expansions });
   }
 
   openShortcutModal() {
@@ -634,87 +554,136 @@ class PopupManager {
 
   editShortcut(index) {
     this.editingShortcutIndex = index;
-    const shortcut = this.shortcuts[index];
-    
-    // Parse key combination
+    const shortcut = this.currentProfile.shortcuts[index];
+    if (!shortcut) return;
+
     const parts = shortcut.keys.split('+');
     this.ctrlKey.checked = parts.includes('ctrl');
     this.shiftKey.checked = parts.includes('shift');
     this.altKey.checked = parts.includes('alt');
     this.mainKey.value = parts[parts.length - 1];
-    
     this.shortcutText.value = shortcut.text;
     this.deleteShortcutBtn.style.display = 'block';
     this.openModal(this.shortcutModal);
   }
 
-  saveShortcut(e) {
-    e.preventDefault();
+  async saveShortcut(event) {
+    event.preventDefault();
 
     const parts = [];
     if (this.ctrlKey.checked) parts.push('ctrl');
     if (this.shiftKey.checked) parts.push('shift');
     if (this.altKey.checked) parts.push('alt');
-    
+
     const mainKey = this.mainKey.value.trim().toLowerCase();
     if (!mainKey) {
-      const msg = this.messages?.enterMainKey?.message || 'Please enter a main key';
-      alert(msg);
+      alert(this.messages?.enterMainKey?.message || 'Please enter a main key');
       return;
     }
     parts.push(mainKey);
 
     const text = this.shortcutText.value.trim();
     if (!text) {
-      const msg = this.messages?.enterText?.message || 'Please enter text to insert';
-      alert(msg);
+      alert(this.messages?.enterText?.message || 'Please enter text to insert');
       return;
     }
 
+    const shortcuts = [...(this.currentProfile.shortcuts || [])];
     const keys = parts.join('+');
 
     if (this.editingShortcutIndex === null) {
-      this.shortcuts.push({ keys, text });
+      shortcuts.push({ keys, text });
     } else {
-      this.shortcuts[this.editingShortcutIndex] = { keys, text };
+      shortcuts[this.editingShortcutIndex] = { keys, text };
     }
 
-    this.saveShortcutsToStorage();
+    this.currentProfile.shortcuts = shortcuts;
+    this.currentProfile = { ...this.currentProfile, shortcuts };
     this.renderShortcuts();
     this.closeModal(this.shortcutModal);
+    await this.saveCurrentProfile({ shortcuts });
   }
 
-  deleteShortcut() {
-    if (this.editingShortcutIndex !== null) {
-      this.shortcuts.splice(this.editingShortcutIndex, 1);
-      this.saveShortcutsToStorage();
-      this.renderShortcuts();
-      this.closeModal(this.shortcutModal);
+  async deleteShortcut() {
+    if (this.editingShortcutIndex === null) return;
+
+    const shortcuts = [...(this.currentProfile.shortcuts || [])];
+    shortcuts.splice(this.editingShortcutIndex, 1);
+    this.currentProfile.shortcuts = shortcuts;
+    this.currentProfile = { ...this.currentProfile, shortcuts };
+    this.renderShortcuts();
+    this.closeModal(this.shortcutModal);
+    await this.saveCurrentProfile({ shortcuts });
+  }
+
+  renderExpansions() {
+    const expansions = this.currentProfile?.expansions || [];
+    if (expansions.length === 0) {
+      const emptyMessage = this.messages?.noExpansions?.message || 'No expansions yet. Add one to get started!';
+      this.expansionsList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+      return;
     }
+
+    const editLabel = this.messages?.edit?.message || 'Edit';
+    this.expansionsList.innerHTML = expansions.map((expansion, index) => `
+      <div class="list-item" data-index="${index}">
+        <div class="list-item-content">
+          <div class="list-item-trigger">${this.escapeHtml(expansion.trigger)}</div>
+          <div class="list-item-value">${this.escapeHtml(expansion.replacement)}</div>
+        </div>
+        <div class="list-item-actions">
+          <button class="list-item-edit" data-index="${index}" type="button">${editLabel}</button>
+        </div>
+      </div>
+    `).join('');
+
+    this.expansionsList.querySelectorAll('.list-item-edit').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.editExpansion(parseInt(btn.dataset.index, 10));
+      });
+    });
   }
 
-  saveShortcutsToStorage() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    
-    if (!chrome_api) return;
+  renderShortcuts() {
+    const shortcuts = this.currentProfile?.shortcuts || [];
+    if (shortcuts.length === 0) {
+      const emptyMessage = this.messages?.noShortcuts?.message || 'No shortcuts yet. Add one to get started!';
+      this.shortcutsList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+      return;
+    }
 
-    chrome_api.runtime.sendMessage(
-      { action: 'saveShortcuts', shortcuts: this.shortcuts, scope: this.domainScope?.checked ? 'domain' : 'global', domain: this.currentDomain },
-      (response) => {
-        if (response?.success) {
-          console.log('Shortcuts saved');
-        }
-      }
-    );
+    const editLabel = this.messages?.edit?.message || 'Edit';
+    this.shortcutsList.innerHTML = shortcuts.map((shortcut, index) => `
+      <div class="list-item" data-index="${index}">
+        <div class="list-item-content">
+          <div class="list-item-trigger">${this.escapeHtml(shortcut.keys)}</div>
+          <div class="list-item-value">${this.escapeHtml(shortcut.text)}</div>
+        </div>
+        <div class="list-item-actions">
+          <button class="list-item-edit" data-index="${index}" type="button">${editLabel}</button>
+        </div>
+      </div>
+    `).join('');
+
+    this.shortcutsList.querySelectorAll('.list-item-edit').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.editShortcut(parseInt(btn.dataset.index, 10));
+      });
+    });
   }
 
   openModal(modal) {
-    modal.classList.add('active');
+    if (modal) {
+      modal.classList.add('active');
+    }
   }
 
   closeModal(modal) {
-    modal.classList.remove('active');
+    if (modal) {
+      modal.classList.remove('active');
+    }
   }
 
   escapeHtml(text) {
@@ -723,87 +692,122 @@ class PopupManager {
     return div.innerHTML;
   }
 
-  /**
-   * Check extension and content script status
-   */
-  async checkExtensionStatus() {
-    if (!this.statusIndicator) return;
-    
-    this.updateStatusIndicator('loading');
-    
-    // Check background service worker
+  loadLanguage() {
+    const saved = localStorage.getItem('crapless_language') || 'en';
+    this.currentLanguage = saved;
+    this.updateLanguageButton();
+    this.applyTranslations();
+  }
+
+  switchLanguage() {
+    const languages = ['en', 'pt', 'es'];
+    const currentIndex = languages.indexOf(this.currentLanguage);
+    const nextIndex = (currentIndex + 1) % languages.length;
+    this.currentLanguage = languages[nextIndex];
+
+    localStorage.setItem('crapless_language', this.currentLanguage);
+    this.updateLanguageButton();
+    this.applyTranslations();
+  }
+
+  updateLanguageButton() {
+    const langMap = { en: 'EN', pt: 'PT', es: 'ES' };
+    this.langSwitcher.textContent = `Lang: ${langMap[this.currentLanguage]}`;
+  }
+
+  async applyTranslations() {
     try {
-      const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                        typeof browser !== 'undefined' ? browser : null;
-      
-      if (!chrome_api) {
-        this.updateStatusIndicator('error');
-        return;
+      const response = await fetch(`/_locales/${this.currentLanguage}/messages.json`);
+      const messages = await response.json();
+      this.messages = messages;
+
+      if (this.profileLabel) this.profileLabel.textContent = messages.profileLabel?.message || 'Profiles';
+      if (this.addProfileBtn) this.addProfileBtn.title = messages.addProfile?.message || 'Add profile';
+      if (this.profileMenuBtn) this.profileMenuBtn.title = messages.profileMenu?.message || 'Profile menu';
+
+      const menuText = {
+        'add-profile': messages.addProfile?.message || 'Add profile',
+        'copy-profile': messages.copyCurrentProfile?.message || 'Copy current profile',
+        'delete-profile': messages.deleteCurrentProfile?.message || 'Delete current profile',
+        'export-profile': messages.exportCurrentProfile?.message || 'Export current profile',
+        'import-profiles': messages.importProfiles?.message || 'Import profile(s)',
+        'export-all-profiles': messages.exportAllProfiles?.message || 'Export all profiles',
+        'delete-all-profiles': messages.deleteAllProfiles?.message || 'Delete all profiles',
+      };
+
+      Object.entries(menuText).forEach(([action, text]) => {
+        const button = this.profileMenu?.querySelector(`button[data-action="${action}"]`);
+        if (button) button.textContent = text;
+      });
+
+      const tabButtons = document.querySelectorAll('.tab-button');
+      if (tabButtons[0]) tabButtons[0].textContent = messages.textExpansions?.message || 'Text Expansions';
+      if (tabButtons[1]) tabButtons[1].textContent = messages.keyboardShortcuts?.message || 'Keyboard Shortcuts';
+
+      if (this.addExpansionBtn) this.addExpansionBtn.textContent = messages.addExpansion?.message || '+ Add Expansion';
+      if (this.addShortcutBtn) this.addShortcutBtn.textContent = messages.addShortcut?.message || '+ Add Shortcut';
+      if (this.testPageLink) this.testPageLink.textContent = messages.testPage?.message || 'Test Page';
+      if (this.githubLink) this.githubLink.textContent = messages.repoLink?.message || 'Github';
+
+      const expansionModalTitle = document.querySelector('#expansionModal h2');
+      const shortcutModalTitle = document.querySelector('#shortcutModal h2');
+      if (expansionModalTitle) expansionModalTitle.textContent = messages.editExpansion?.message || 'Edit Expansion';
+      if (shortcutModalTitle) shortcutModalTitle.textContent = messages.editShortcut?.message || 'Edit Shortcut';
+
+      const triggerLabel = document.querySelector('label[for="expansionTrigger"]');
+      const replacementLabel = document.querySelector('label[for="expansionReplacement"]');
+      const keysLabel = document.querySelector('#shortcutModal .form-group label');
+      const textLabel = document.querySelector('label[for="shortcutText"]');
+      if (triggerLabel) triggerLabel.textContent = messages.trigger?.message || "Trigger (e.g., '\\man'):";
+      if (replacementLabel) replacementLabel.textContent = messages.replacement?.message || 'Replacement Text:';
+      if (keysLabel) keysLabel.textContent = messages.keys?.message || 'Keys:';
+      if (textLabel) textLabel.textContent = messages.textToInsert?.message || 'Text to Insert:';
+
+      if (this.expansionTrigger) this.expansionTrigger.placeholder = messages.triggerPlaceholder?.message || '\\man';
+      if (this.expansionReplacement) this.expansionReplacement.placeholder = messages.replacementPlaceholder?.message || 'manuscript';
+      if (this.mainKey) this.mainKey.placeholder = messages.keyPlaceholder?.message || "Key (e.g., 'm')";
+
+      const saveButtons = document.querySelectorAll('.btn-primary[type="submit"]');
+      saveButtons.forEach((btn) => {
+        btn.textContent = messages.save?.message || 'Save';
+      });
+
+      const deleteButtons = document.querySelectorAll('.btn-secondary[type="button"]');
+      deleteButtons.forEach((btn) => {
+        if (btn.id === 'deleteExpansionBtn' || btn.id === 'deleteShortcutBtn') {
+          btn.textContent = messages.delete?.message || 'Delete';
+        }
+      });
+
+      if (this.confirmTitle) this.confirmTitle.textContent = messages.warning?.message || 'Warning';
+      if (this.confirmCancelBtn) this.confirmCancelBtn.textContent = messages.confirmCancel?.message || 'Cancel';
+
+      const punctAwareLabel = this.punctAware?.closest('label');
+      const caseSensitiveLabel = this.caseSensitive?.closest('label');
+      if (punctAwareLabel && this.punctAware) {
+        punctAwareLabel.textContent = '';
+        punctAwareLabel.appendChild(this.punctAware);
+        punctAwareLabel.appendChild(document.createTextNode(` ${messages.punctuationAware?.message || 'Punctuation aware'}`));
+        const tip = messages.punctuationAwareTooltip?.message || 'When enabled, punctuation is considered when matching triggers (e.g., commas, periods).';
+        try { punctAwareLabel.title = tip; } catch (e) {}
+        try { this.punctAware.title = tip; } catch (e) {}
+      }
+      if (caseSensitiveLabel && this.caseSensitive) {
+        caseSensitiveLabel.textContent = '';
+        caseSensitiveLabel.appendChild(this.caseSensitive);
+        caseSensitiveLabel.appendChild(document.createTextNode(` ${messages.caseSensitive?.message || 'Case sensitive'}`));
+        const tip2 = messages.caseSensitiveTooltip?.message || 'When enabled, triggers must match letter case exactly.';
+        try { caseSensitiveLabel.title = tip2; } catch (e) {}
+        try { this.caseSensitive.title = tip2; } catch (e) {}
       }
 
-      // Ping background to confirm it's alive
-      chrome_api.runtime.sendMessage(
-        { action: 'ping' },
-        (response) => {
-          if (response?.ok) {
-            this.extensionReady = true;
-            this.checkContentScriptStatus();
-          } else {
-            this.updateStatusIndicator('error');
-          }
-        }
-      );
-    } catch (err) {
-      console.error('[Expander] Failed to check extension status:', err);
-      this.updateStatusIndicator('error');
+      this.renderExpansions();
+      this.renderShortcuts();
+    } catch (error) {
+      console.error('Failed to load translations:', error);
     }
   }
 
-  /**
-   * Check if content script is loaded in current tab
-   */
-  checkContentScriptStatus() {
-    const chrome_api = typeof chrome !== 'undefined' ? chrome : 
-                      typeof browser !== 'undefined' ? browser : null;
-    
-    if (!chrome_api || !chrome_api.tabs) {
-      // No tabs API, mark as ready anyway (popup doesn't need content script)
-      this.contentScriptReady = true;
-      this.updateStatusIndicator('ready');
-      return;
-    }
-
-    // Get current active tab and ping content script
-    chrome_api.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) {
-        this.updateStatusIndicator('ready');
-        return;
-      }
-
-      chrome_api.tabs.sendMessage(
-        tabs[0].id,
-        { action: 'ping' },
-        (response) => {
-          // Check for errors (e.g., content script not loaded due to browser restrictions)
-          const err = chrome_api.runtime.lastError;
-          if (err) {
-            // Forbidden: extension cannot load on this page (extension URLs, system pages, etc)
-            this.updateStatusIndicator('forbidden');
-          } else if (response?.ok) {
-            this.contentScriptReady = true;
-            this.updateStatusIndicator('ready');
-          } else {
-            // Content script not loaded on this tab, but not forbidden
-            this.updateStatusIndicator('ready');
-          }
-        }
-      );
-    });
-  }
-
-  /**
-   * Update status indicator emoji and title
-   */
   updateStatusIndicator(state) {
     if (!this.statusIndicator) return;
 
@@ -811,16 +815,69 @@ class PopupManager {
       loading: { emoji: '⏳', title: 'Loading extension...' },
       ready: { emoji: '✅', title: 'Extension ready' },
       error: { emoji: '❌', title: 'Extension error' },
-      forbidden: { emoji: '🚫', title: 'Content script not loaded on this page' }
+      forbidden: { emoji: '🚫', title: 'Content script not loaded on this page' },
     };
 
     const stateInfo = states[state] || states.error;
     this.statusIndicator.textContent = stateInfo.emoji;
     this.statusIndicator.title = stateInfo.title;
   }
+
+  async checkExtensionStatus() {
+    if (!this.statusIndicator) return;
+
+    this.updateStatusIndicator('loading');
+
+    try {
+      const api = this.getApi();
+      if (!api) {
+        this.updateStatusIndicator('error');
+        return;
+      }
+
+      this.sendMessage({ action: 'ping' }).then((response) => {
+        if (response?.ok) {
+          this.extensionReady = true;
+          this.checkContentScriptStatus();
+        } else {
+          this.updateStatusIndicator('error');
+        }
+      });
+    } catch (error) {
+      console.error('[Expander] Failed to check extension status:', error);
+      this.updateStatusIndicator('error');
+    }
+  }
+
+  checkContentScriptStatus() {
+    const api = this.getApi();
+    if (!api?.tabs) {
+      this.contentScriptReady = true;
+      this.updateStatusIndicator('ready');
+      return;
+    }
+
+    api.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) {
+        this.updateStatusIndicator('ready');
+        return;
+      }
+
+      api.tabs.sendMessage(tabs[0].id, { action: 'ping' }, (response) => {
+        const err = api.runtime.lastError;
+        if (err) {
+          this.updateStatusIndicator('forbidden');
+        } else if (response?.ok) {
+          this.contentScriptReady = true;
+          this.updateStatusIndicator('ready');
+        } else {
+          this.updateStatusIndicator('ready');
+        }
+      });
+    });
+  }
 }
 
-// Initialize popup when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     new PopupManager();

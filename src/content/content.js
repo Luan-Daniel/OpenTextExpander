@@ -22,32 +22,14 @@ class ContentScriptManager {
     console.info('[Expander] Content manager init');
     this._attachListeners();
     this._setupMessageListener();
-    // Load settings
-    try {
-      const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
-      if (api?.storage?.sync) {
-        api.storage.sync.get(['settings'], (result) => {
-          if (result?.settings) this.settings = Object.assign(this.settings, result.settings);
-        });
-      }
-    } catch {}
+    this.settings = Object.assign({ punctuationAware: false, caseSensitive: false }, expansionEngine.settings || {});
   }
 
-  /**
-   * Reinitialize engine with correct domain context based on current settings
-   */
   async _reinitializeEngine() {
     try {
-      const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
-      if (!api?.storage?.sync) return;
-
-      // Check if domain scope is enabled
-      api.storage.sync.get(['settings'], (result) => {
-        const domainScope = result?.settings?.domainScope || false;
-        const domain = domainScope ? currentDomain : null;
-        console.info('[Expander] Reinitializing engine', { domainScope, domain });
-        expansionEngine.initialize(domain);
-      });
+      console.info('[Expander] Reinitializing engine for active profile');
+      await expansionEngine.initialize();
+      this.settings = Object.assign({ punctuationAware: false, caseSensitive: false }, expansionEngine.settings || {});
     } catch (err) {
       console.warn('[Expander] Failed to reinitialize engine:', err);
     }
@@ -341,55 +323,16 @@ class ContentScriptManager {
           return; // No async work
         }
 
-        if (request.action === 'expansionsUpdated') {
-          console.info('[Expander] expansionsUpdated message received');
+        if (request.action === 'profilesUpdated' || request.action === 'expansionsUpdated' || request.action === 'shortcutsUpdated') {
+          console.info('[Expander] profile update message received');
           this._reinitializeEngine();
-        }
-
-        if (request.action === 'shortcutsUpdated') {
-          console.info('[Expander] shortcutsUpdated message received');
-          this._reinitializeEngine();
-        }
-
-        if (request.action === 'settingsUpdated') {
-          console.info('[Expander] settingsUpdated message received');
-          // Reload settings and engine
-          try {
-            const api = typeof chrome !== 'undefined' ? chrome : (typeof browser !== 'undefined' ? browser : null);
-            if (api?.storage?.sync) {
-              api.storage.sync.get(['settings'], (result) => {
-                if (result?.settings) {
-                  this.settings = Object.assign(this.settings, result.settings);
-                  this._reinitializeEngine();
-                }
-              });
-            }
-          } catch {}
         }
       });
     } else if (typeof browser !== 'undefined' && browser.runtime) {
       browser.runtime.onMessage.addListener((request) => {
-        if (request.action === 'expansionsUpdated') {
-          console.info('[Expander] expansionsUpdated message received');
-          expansionEngine.initialize();
-        }
-        if (request.action === 'shortcutsUpdated') {
-          console.info('[Expander] shortcutsUpdated message received');
+        if (request.action === 'profilesUpdated' || request.action === 'expansionsUpdated' || request.action === 'shortcutsUpdated') {
+          console.info('[Expander] profile update message received');
           this._reinitializeEngine();
-        }
-        if (request.action === 'settingsUpdated') {
-          console.info('[Expander] settingsUpdated message received');
-          try {
-            const api = typeof browser !== 'undefined' ? browser : null;
-            if (api?.storage?.sync) {
-              api.storage.sync.get(['settings']).then(result => {
-                if (result?.settings) {
-                  this.settings = Object.assign(this.settings, result.settings);
-                  this._reinitializeEngine();
-                }
-              });
-            }
-          } catch {}
         }
         if (request.action === 'ping') {
           return { ok: true, source: 'content' };
@@ -402,16 +345,12 @@ class ContentScriptManager {
 // Initialize content script manager
 const contentManager = new ContentScriptManager();
 
-// Get current page domain
-const currentDomain = window.location.hostname;
-
 // Wait for expansion engine to be ready
 const initCheck = setInterval(() => {
   if (expansionEngine.isReady) {
     clearInterval(initCheck);
     contentManager.init();
-    // Initialize engine with domain context based on current settings
-    contentManager._reinitializeEngine();
+    void contentManager._reinitializeEngine();
   }
 }, 50);
 
@@ -420,6 +359,6 @@ setTimeout(() => {
   clearInterval(initCheck);
   if (!expansionEngine.isReady) {
     contentManager.init();
-    contentManager._reinitializeEngine();
+    void contentManager._reinitializeEngine();
   }
 }, 2000);
