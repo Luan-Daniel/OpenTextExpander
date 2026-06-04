@@ -66,7 +66,7 @@
     "message": "Please fill in both fields"
   },
   "enterMainKey": {
-    "message": "Please enter a main key"
+    "message": "Please enter a single key"
   },
   "enterText": {
     "message": "Please enter text to insert"
@@ -136,6 +136,15 @@
   },
   "renameProfilePrompt": {
     "message": "Enter a new name for the profile"
+  },
+  "bindToUrl": {
+    "message": "Bind to URL"
+  },
+  "removeBind": {
+    "message": "Remove bind"
+  },
+  "bindToUrlPrompt": {
+    "message": "Enter a URL match string for this profile"
   },
   "warning": {
     "message": "Warning"

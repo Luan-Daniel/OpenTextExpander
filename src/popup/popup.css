@@ -90,11 +90,29 @@ body {
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
-.profile-label {
+.profile-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 70px;
+  min-height: 38px;
+  flex-wrap: wrap;
+}
+
+.profile-label {
   font-size: 13px;
   font-weight: 600;
   color: #35516f;
+}
+
+.profile-bind-label {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .profile-controls {
@@ -447,7 +465,15 @@ textarea {
 
 .key-input {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.key-modifiers {
+  display: flex;
   gap: 8px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
@@ -500,7 +526,9 @@ textarea {
 }
 
 #mainKey {
-  flex: 1;
+  width: 100%;
+  flex: none;
+  height: 38px;
 }
 
 .form-actions {

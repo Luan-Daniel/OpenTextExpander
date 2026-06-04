@@ -26,6 +26,7 @@ class PopupManager {
     this.langSwitcher = document.getElementById('langSwitcher');
     this.tabButtons = document.querySelectorAll('.tab-button');
 
+    this.profileBindLabel = document.getElementById('profileBindLabel');
     this.profileLabel = document.getElementById('profileLabel');
     this.profileSelect = document.getElementById('profileSelect');
     this.addProfileBtn = document.getElementById('addProfileBtn');
@@ -223,12 +224,36 @@ class PopupManager {
     });
 
     this.profileSelect.value = this.activeProfileId || this.profiles[0].id;
+    this.updateProfileBindingUI();
   }
 
   applyCurrentProfileToUI() {
     const settings = this.currentProfile?.settings || {};
     if (this.punctAware) this.punctAware.checked = !!settings.punctuationAware;
     if (this.caseSensitive) this.caseSensitive.checked = !!settings.caseSensitive;
+    this.updateProfileBindingUI();
+  }
+
+  getProfileBindUrl(profile = this.getActiveProfile()) {
+    const bindUrl = profile?.settings?.urlBind;
+    return typeof bindUrl === 'string' ? bindUrl.trim() : '';
+  }
+
+  updateProfileBindingUI() {
+    const bindUrl = this.getProfileBindUrl();
+
+    if (this.profileBindLabel) {
+      this.profileBindLabel.textContent = bindUrl;
+      this.profileBindLabel.hidden = !bindUrl;
+      this.profileBindLabel.title = bindUrl ? bindUrl : '';
+    }
+
+    const bindButton = this.profileMenu?.querySelector('button[data-action="bind-url"]');
+    if (bindButton) {
+      bindButton.textContent = bindUrl
+        ? (this.messages?.removeBind?.message || 'Remove bind')
+        : (this.messages?.bindToUrl?.message || 'Bind to URL');
+    }
   }
 
   getActiveProfile() {
@@ -279,6 +304,54 @@ class PopupManager {
 
         const response = await this.sendMessage({ action: 'saveProfileState', profileId: this.activeProfileId, updates: { name: trimmed } });
         if (response) {
+          this.applyProfilesState(response);
+        } else {
+          await this.loadData();
+        }
+        break;
+      }
+      case 'bind-url': {
+        const currentProfile = this.getActiveProfile();
+        if (!currentProfile?.id) return;
+
+        const currentBind = this.getProfileBindUrl(currentProfile);
+        if (currentBind) {
+          const nextSettings = { ...(currentProfile.settings || {}) };
+          delete nextSettings.urlBind;
+
+          const response = await this.sendMessage({
+            action: 'saveProfileState',
+            profileId: this.activeProfileId,
+            updates: { settings: nextSettings },
+          });
+
+          if (response?.profiles) {
+            this.applyProfilesState(response);
+          } else {
+            await this.loadData();
+          }
+          break;
+        }
+
+        const promptMessage = this.messages?.bindToUrlPrompt?.message || 'Enter a URL match string for this profile';
+        const matchString = window.prompt(promptMessage, '');
+        if (matchString === null) return;
+
+        const trimmed = matchString.trim();
+        if (!trimmed) return;
+
+        const nextSettings = {
+          ...(currentProfile.settings || {}),
+          urlBind: trimmed,
+        };
+
+        const response = await this.sendMessage({
+          action: 'saveProfileState',
+          profileId: this.activeProfileId,
+          updates: { settings: nextSettings },
+        });
+
+        if (response?.profiles) {
           this.applyProfilesState(response);
         } else {
           await this.loadData();
@@ -592,8 +665,8 @@ class PopupManager {
     if (this.altKey.checked) parts.push('alt');
 
     const mainKey = this.mainKey.value.trim().toLowerCase();
-    if (!mainKey) {
-      alert(this.messages?.enterMainKey?.message || 'Please enter a main key');
+    if (!this.isValidShortcutKey(mainKey)) {
+      alert(this.messages?.enterMainKey?.message || 'Please enter a single key');
       return;
     }
     parts.push(mainKey);
@@ -618,6 +691,41 @@ class PopupManager {
     this.renderShortcuts();
     this.closeModal(this.shortcutModal);
     await this.saveCurrentProfile({ shortcuts });
+  }
+
+  isValidShortcutKey(key) {
+    if (!key) return false;
+
+    const normalized = key.trim().toLowerCase();
+    if (!normalized || normalized.includes(' ') || normalized.includes('+')) {
+      return false;
+    }
+
+    if (/^[a-z0-9]$/.test(normalized)) return true;
+    if (/^f([1-9]|1[0-9]|2[0-4])$/.test(normalized)) return true;
+
+    return [
+      'enter',
+      'tab',
+      'escape',
+      'backspace',
+      'delete',
+      'home',
+      'end',
+      'pageup',
+      'pagedown',
+      'arrowup',
+      'arrowdown',
+      'arrowleft',
+      'arrowright',
+      'insert',
+      'capslock',
+      'numlock',
+      'scrolllock',
+      'pause',
+      'contextmenu',
+      'space',
+    ].includes(normalized);
   }
 
   async deleteShortcut() {
@@ -745,6 +853,9 @@ class PopupManager {
         'add-profile': messages.addProfile?.message || 'Add profile',
         'copy-profile': messages.copyCurrentProfile?.message || 'Copy current profile',
         'rename-profile': messages.renameProfile?.message || 'Rename profile',
+        'bind-url': this.getProfileBindUrl()
+          ? (messages.removeBind?.message || 'Remove bind')
+          : (messages.bindToUrl?.message || 'Bind to URL'),
         'delete-profile': messages.deleteCurrentProfile?.message || 'Delete current profile',
         'export-profile': messages.exportCurrentProfile?.message || 'Export current profile',
         'import-profiles': messages.importProfiles?.message || 'Import profile(s)',
@@ -817,6 +928,8 @@ class PopupManager {
         try { caseSensitiveLabel.title = tip2; } catch (e) {}
         try { this.caseSensitive.title = tip2; } catch (e) {}
       }
+
+      this.updateProfileBindingUI();
 
       this.renderExpansions();
       this.renderShortcuts();

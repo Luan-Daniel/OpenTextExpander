@@ -15,6 +15,7 @@ class ExpansionEngine {
 
     this.isReady = false;
     this.settings = { caseSensitive: false, punctuationAware: false };
+    this.hasResolvedUrlBinding = false;
   }
 
   /**
@@ -47,12 +48,12 @@ class ExpansionEngine {
   _getStorageData() {
     return new Promise((resolve) => {
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.sync.get(null, (allData) => {
-          resolve(this._extractProfileData(allData));
+        chrome.storage.sync.get(null, async (allData) => {
+          resolve(await this._extractProfileData(allData));
         });
       } else if (typeof browser !== 'undefined' && browser.storage) {
-        browser.storage.sync.get().then(allData => {
-          resolve(this._extractProfileData(allData));
+        browser.storage.sync.get().then(async allData => {
+          resolve(await this._extractProfileData(allData));
         });
       } else {
         resolve({});
@@ -60,17 +61,44 @@ class ExpansionEngine {
     });
   }
 
-  _extractProfileData(allData) {
+  async _extractProfileData(allData) {
     if (allData?.profiles && typeof allData.profiles === 'object' && !Array.isArray(allData.profiles)) {
       const profiles = allData.profiles;
       const activeProfileId = profiles[allData.activeProfileId] ? allData.activeProfileId : Object.keys(profiles)[0];
-      const profile = profiles[activeProfileId] || {};
+      let nextActiveProfileId = activeProfileId;
+
+      // URL binding is applied once per page load. Subsequent re-inits honor manual profile changes.
+      if (!this.hasResolvedUrlBinding) {
+        const currentUrl = typeof window !== 'undefined' && window.location ? window.location.href.toLowerCase() : '';
+        const entries = Object.entries(profiles);
+        const currentProfile = profiles[activeProfileId] || {};
+        const currentBindUrl = typeof currentProfile?.settings?.urlBind === 'string' ? currentProfile.settings.urlBind.trim().toLowerCase() : '';
+
+        if (!(currentBindUrl && currentUrl.includes(currentBindUrl))) {
+          const matchedEntry = entries.find(([profileId, profile]) => {
+            const bindUrl = typeof profile?.settings?.urlBind === 'string' ? profile.settings.urlBind.trim().toLowerCase() : '';
+            return profileId !== activeProfileId && bindUrl && currentUrl.includes(bindUrl);
+          });
+          if (matchedEntry) {
+            nextActiveProfileId = matchedEntry[0];
+          }
+        }
+
+        this.hasResolvedUrlBinding = true;
+      }
+
+      if (nextActiveProfileId !== allData.activeProfileId) {
+        await this._saveToStorage('activeProfileId', nextActiveProfileId);
+      }
+
+      const profile = profiles[nextActiveProfileId] || {};
 
       return {
         expansions: profile.expansions || [],
         shortcuts: profile.shortcuts || [],
         settings: profile.settings || {},
-        profileName: profile.name || 'default'
+        profileName: profile.name || 'default',
+        activeProfileId: nextActiveProfileId,
       };
     }
 
@@ -177,7 +205,7 @@ class ExpansionEngine {
     // Safety check for event.key
     if (!event.key) return null;
     
-    const key = event.key.toLowerCase();
+    const key = event.key === ' ' ? 'space' : event.key.toLowerCase();
     // Only add non-modifier keys
     if (!['control', 'shift', 'alt', 'meta'].includes(key)) {
       parts.push(key);

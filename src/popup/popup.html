@@ -15,7 +15,10 @@
         </div>
 
         <div class="profile-bar">
-            <label id="profileLabel" for="profileSelect" class="profile-label">Profiles</label>
+            <div class="profile-label-group">
+                <label id="profileLabel" for="profileSelect" class="profile-label">Profiles</label>
+                <span id="profileBindLabel" class="profile-bind-label" hidden></span>
+            </div>
             <div class="profile-controls">
                 <select id="profileSelect" class="profile-select"></select>
                 <button id="addProfileBtn" class="icon-btn square-btn" type="button" title="Add profile">+</button>
@@ -25,6 +28,7 @@
                 <button type="button" data-action="add-profile"></button>
                 <button type="button" data-action="copy-profile"></button>
                 <button type="button" data-action="rename-profile"></button>
+                <button type="button" data-action="bind-url"></button>
                 <button type="button" data-action="import-profiles"></button>
                 <button type="button" data-action="export-profile"></button>
                 <button type="button" data-action="export-all-profiles"></button>
@@ -99,16 +103,18 @@
                 <div class="form-group">
                     <label>Keys:</label>
                     <div class="key-input">
-                        <label class="checkbox">
-                            <input type="checkbox" id="ctrlKey"> Ctrl
-                        </label>
-                        <label class="checkbox">
-                            <input type="checkbox" id="shiftKey"> Shift
-                        </label>
-                        <label class="checkbox">
-                            <input type="checkbox" id="altKey"> Alt
-                        </label>
-                        <input type="text" id="mainKey" placeholder="Key (e.g., 'm')">
+                        <div class="key-modifiers">
+                            <label class="checkbox">
+                                <input type="checkbox" id="ctrlKey"> Ctrl
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" id="shiftKey"> Shift
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" id="altKey"> Alt
+                            </label>
+                        </div>
+                        <input type="text" id="mainKey" inputmode="text" spellcheck="false" placeholder="Key (e.g., 'm')">
                     </div>
                 </div>
                 <div class="form-group">

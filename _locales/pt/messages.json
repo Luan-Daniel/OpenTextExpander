@@ -66,7 +66,7 @@
     "message": "Por favor, preencha ambos os campos"
   },
   "enterMainKey": {
-    "message": "Por favor, insira uma tecla principal"
+    "message": "Por favor, insira uma única tecla"
   },
   "enterText": {
     "message": "Por favor, insira o texto a inserir"
@@ -136,6 +136,15 @@
   },
   "renameProfilePrompt": {
     "message": "Digite um novo nome para o perfil"
+  },
+  "bindToUrl": {
+    "message": "Vincular à URL"
+  },
+  "removeBind": {
+    "message": "Remover vínculo"
+  },
+  "bindToUrlPrompt": {
+    "message": "Digite uma string para coincidir com a URL deste perfil"
   },
   "warning": {
     "message": "Aviso"
